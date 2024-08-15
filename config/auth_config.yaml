@@ -1,0 +1,10 @@
+server:
+  address: :8080
+  shutdown_timeout: 5s
+service:
+  access_token_timeout: 30m
+  refresh_token_timeout: 72h
+mail:
+  host: smtp.gmail.com:587
+  sender: golang.auth.service@gmail.com
+  password: "fxjg oseq idix xyro"
