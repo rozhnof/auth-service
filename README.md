@@ -1,5 +1,7 @@
 # Auth Service
 
+## Authentication service for issuing tokens without confirming passwords
+
 ## Requirements
 
 Before you begin, ensure you have the following installed:
@@ -24,6 +26,9 @@ docker compose up -d
 
 ## API Documentation
 
-View the interactive API documentation on Swagger UI (the auth-service must be running):
+### Endpoints
 
+![Alt text](/resources/endpoints.png?raw=true "Optional Title")
+
+### The interactive API documentation on Swagger UI (the auth-service must be running):
 [![Swagger UI](https://img.shields.io/badge/-API%20Documentation-blue)](https://localhost:8080/swagger/)
