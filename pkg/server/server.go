@@ -33,38 +33,23 @@ func New(cfg Config, handler http.Handler) *Server {
 }
 
 func (s *Server) RunTLS(ctx context.Context) error {
-	errChan := make(chan error)
-
+	var listenAndServeErr error
 	go func() {
 		if err := s.srv.ListenAndServeTLS("", ""); !errors.Is(err, http.ErrServerClosed) {
-			errChan <- err
-		} else {
-			errChan <- nil
+			listenAndServeErr = err
 		}
 	}()
 
-	go func() {
-		<-ctx.Done()
+	<-ctx.Done()
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
-		defer cancel()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
+	defer cancel()
 
-		if err := s.Shutdown(shutdownCtx); err != nil {
-			errChan <- err
-		} else {
-			errChan <- nil
+	if err := s.srv.Shutdown(shutdownCtx); err != nil {
+		if listenAndServeErr != nil {
+			return errors.Join(err, listenAndServeErr)
 		}
-	}()
-
-	listenAndServeErr := <-errChan
-	shutdownErr := <-errChan
-
-	if listenAndServeErr != nil {
-		return listenAndServeErr
-	}
-
-	if shutdownErr != nil {
-		return shutdownErr
+		return err
 	}
 
 	return nil
