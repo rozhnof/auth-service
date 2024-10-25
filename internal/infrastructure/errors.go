@@ -3,5 +3,6 @@ package repository
 import "errors"
 
 var (
-	ErrNoData = errors.New("no data")
+	ErrNotExists = errors.New("not exists")
+	ErrDuplicate = errors.New("duplicate")
 )

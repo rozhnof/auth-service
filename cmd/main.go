@@ -1,33 +1,27 @@
 package main
 
 import (
-	handlers "auth/internal/application/handlers/http"
-	"auth/internal/domain/services"
-	repository "auth/internal/infrastructure/repository/postgres"
+	http_app "auth/internal/app/http"
+	user_services "auth/internal/application/services/user"
+	postgres_user_repository "auth/internal/infrastructure/repository/postgres/user"
 	"auth/internal/pkg/config"
-	"auth/pkg/config_reader"
-	"auth/pkg/database"
-	"auth/pkg/mail"
-	"auth/pkg/server"
+	postgres_database "auth/internal/pkg/database/postgres"
+	http_server "auth/internal/pkg/server/http"
+	http_user_handlers "auth/internal/presentation/http/user/handlers"
 	"context"
-	"crypto/tls"
 	"log"
-	"net/http"
+	"log/slog"
+	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/caarlos0/env"
-	httpSwagger "github.com/swaggo/http-swagger"
-
 	_ "auth/docs"
 
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 )
 
 const (
-	cfgPath  = "config/auth_config.yaml"
-	certPath = "cert.pem"
-	keyPath  = "key.pem"
+	EnvConfigPath = "CONFIG_PATH"
 )
 
 // @title           Authentication Service API
@@ -40,120 +34,66 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	cfg, err := loadConfig(cfgPath)
-	if err != nil {
-		log.Fatalf("error loading config: %s", err)
-	}
-
-	secrets, err := loadSecrets()
-	if err != nil {
-		log.Fatalf("error loading secrets: %s", err)
-	}
-
-	cert, err := loadAuthCertificate(certPath, keyPath)
-	if err != nil {
-		log.Fatalf("failed to load key pair: %v", err)
-	}
-
-	db, err := database.NewDatabase(ctx, secrets.DatabaseURL)
+	cfg, err := config.NewConfig(os.Getenv(EnvConfigPath))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.GetPool().Close()
 
-	serverCfg := server.Config{
-		Address:         cfg.Server.Address,
-		ShutdownTimeout: cfg.Server.ShutdownTimeout,
-		TLSConfig: &tls.Config{
-			Certificates: []tls.Certificate{
-				*cert,
-			},
-		},
-	}
+	InitLogging(cfg.Logger.Level)
 
-	serviceCfg := services.Config{
-		SecretKey:           []byte(secrets.SecretKey),
-		AccessTokenTimeout:  cfg.Service.AccessTokenTimeout,
-		RefreshTokenTimeout: cfg.Service.RefreshTokenTimeout,
+	postgresDatabase, err := postgres_database.NewDatabase(ctx, postgres_database.CreateConnectionString(cfg.Repository))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	var (
-		authMailSender = mail.NewMailSender(cfg.Mail.Sender, cfg.Mail.Password, cfg.Mail.Host)
-		authRepository = repository.NewAuthRepository(db)
-		authService    = services.NewAuthService(authRepository, *authMailSender, serviceCfg)
-		authHandler    = handlers.NewAuthHandler(authService)
-		authRouter     = mux.NewRouter()
+		userRepository = postgres_user_repository.NewUserRepository(postgresDatabase)
+		userService    = user_services.NewAuthService(userRepository)
+		userHandler    = http_user_handlers.NewAuthHandler(userService)
+		router         = gin.New()
 	)
 
-	initRoutes(authRouter, authHandler)
+	http_app.InitRoutes(router, userHandler)
 
-	authServer := server.New(serverCfg, authRouter)
-	if err := authServer.RunTLS(ctx); err != nil {
+	log.Println("http server started successfully")
+	if err := RunHTTP(ctx, cfg, router); err != nil {
 		log.Fatal(err)
 	}
+	log.Println("http server stopped successfully")
 }
 
-func loadAuthCertificate(certPath string, keyPath string) (*tls.Certificate, error) {
-	authCertificate, err := tls.LoadX509KeyPair(certPath, keyPath)
-	if err != nil {
-		return nil, err
+func InitLogging(logLevel string) {
+	var level slog.Leveler
+
+	switch logLevel {
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warning":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
 	}
-	return &authCertificate, nil
+
+	var (
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+		logger  = slog.New(handler)
+	)
+
+	slog.SetDefault(logger)
 }
 
-func loadSecrets() (*config.AuthSecrets, error) {
-	var secrets config.AuthSecrets
-	if err := env.Parse(&secrets); err != nil {
-		return nil, err
+func RunHTTP(ctx context.Context, cfg *config.Config, router *gin.Engine) error {
+	serverCfg := http_server.Config{
+		Address:         cfg.Server.HTTP.Address,
+		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
 	}
 
-	if err := secrets.Validate(); err != nil {
-		return nil, err
-	}
+	server := http_server.New(
+		serverCfg,
+		router,
+	)
 
-	return &secrets, nil
-}
-
-func loadConfig(authConfigPath string) (*config.AuthConfig, error) {
-	var cfg config.AuthConfig
-	if err := config_reader.LoadYaml(authConfigPath, &cfg); err != nil {
-		return nil, err
-	}
-
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
-	return &cfg, nil
-}
-
-func initRoutes(router *mux.Router, handler *handlers.AuthHandler) {
-	router.HandleFunc("/auth/register", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			handler.Register(w, r)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	})
-
-	router.HandleFunc("/auth/login", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			handler.Login(w, r)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	})
-
-	router.HandleFunc("/auth/refresh", func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			handler.Refresh(w, r)
-		default:
-			w.WriteHeader(http.StatusNotFound)
-		}
-	})
-
-	router.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+	return server.Run(ctx)
 }

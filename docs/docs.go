@@ -24,7 +24,6 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
-                "summary": "User login",
                 "operationId": "login-user",
                 "parameters": [
                     {
@@ -33,13 +32,22 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "description": "User login details",
+                        "name": "requestBody",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/http_user_requests.LoginRequest"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Successful login",
                         "schema": {
-                            "$ref": "#/definitions/dto.LoginResponse"
+                            "$ref": "#/definitions/http_user_responses.LoginResponse"
                         }
                     },
                     "400": {
@@ -72,7 +80,6 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Token refresh",
                 "operationId": "refresh-token",
                 "parameters": [
                     {
@@ -81,7 +88,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RefreshRequest"
+                            "$ref": "#/definitions/http_user_requests.RefreshRequest"
                         }
                     }
                 ],
@@ -89,7 +96,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Tokens refreshed successfully",
                         "schema": {
-                            "$ref": "#/definitions/dto.RefreshResponse"
+                            "$ref": "#/definitions/http_user_responses.RefreshResponse"
                         }
                     },
                     "400": {
@@ -122,7 +129,6 @@ const docTemplate = `{
                 "produces": [
                     "application/json"
                 ],
-                "summary": "Register a new user",
                 "operationId": "register-user",
                 "parameters": [
                     {
@@ -131,7 +137,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/dto.RegisterRequest"
+                            "$ref": "#/definitions/http_user_requests.RegisterRequest"
                         }
                     }
                 ],
@@ -139,7 +145,7 @@ const docTemplate = `{
                     "200": {
                         "description": "Successfully registered new user",
                         "schema": {
-                            "$ref": "#/definitions/dto.RegisterResponse"
+                            "$ref": "#/definitions/http_user_responses.RegisterResponse"
                         }
                     },
                     "400": {
@@ -159,40 +165,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "dto.LoginResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.RefreshRequest": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.RefreshResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                }
-            }
-        },
-        "dto.RegisterRequest": {
+        "http_user_requests.LoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -200,15 +173,56 @@ const docTemplate = `{
                 }
             }
         },
-        "dto.RegisterResponse": {
+        "http_user_requests.RefreshRequest": {
             "type": "object",
             "properties": {
-                "user": {
-                    "$ref": "#/definitions/dto.User"
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
                 }
             }
         },
-        "dto.User": {
+        "http_user_requests.RegisterRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "http_user_responses.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "http_user_responses.RefreshResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "http_user_responses.RegisterResponse": {
+            "type": "object",
+            "properties": {
+                "user": {
+                    "$ref": "#/definitions/http_user_structs.User"
+                }
+            }
+        },
+        "http_user_structs.User": {
             "type": "object",
             "properties": {
                 "email": {

@@ -31,4 +31,4 @@ docker compose up -d
 ![Alt text](/resources/endpoints.png?raw=true "Optional Title")
 
 ### The interactive API documentation on Swagger UI (the auth-service must be running):
-[![Swagger UI](https://img.shields.io/badge/-API%20Documentation-blue)](https://localhost:8080/swagger/)
+[![Swagger UI](https://img.shields.io/badge/-API%20Documentation-blue)](http://localhost:8080/swagger/index.html)

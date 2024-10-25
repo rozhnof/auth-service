@@ -1,37 +1,42 @@
 basePath: /
 definitions:
-  dto.LoginResponse:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
-  dto.RefreshRequest:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
-  dto.RefreshResponse:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-    type: object
-  dto.RegisterRequest:
+  http_user_requests.LoginRequest:
     properties:
       email:
         type: string
     type: object
-  dto.RegisterResponse:
+  http_user_requests.RefreshRequest:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  http_user_requests.RegisterRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  http_user_responses.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  http_user_responses.RefreshResponse:
+    properties:
+      access_token:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  http_user_responses.RegisterResponse:
     properties:
       user:
-        $ref: '#/definitions/dto.User'
+        $ref: '#/definitions/http_user_structs.User'
     type: object
-  dto.User:
+  http_user_structs.User:
     properties:
       email:
         type: string
@@ -57,13 +62,19 @@ paths:
         name: user_id
         required: true
         type: string
+      - description: User login details
+        in: body
+        name: requestBody
+        required: true
+        schema:
+          $ref: '#/definitions/http_user_requests.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successful login
           schema:
-            $ref: '#/definitions/dto.LoginResponse'
+            $ref: '#/definitions/http_user_responses.LoginResponse'
         "400":
           description: Bad Request - missing or invalid user_id
           schema:
@@ -76,7 +87,6 @@ paths:
           description: Internal Server Error
           schema:
             type: string
-      summary: User login
   /auth/refresh:
     post:
       consumes:
@@ -89,14 +99,14 @@ paths:
         name: requestBody
         required: true
         schema:
-          $ref: '#/definitions/dto.RefreshRequest'
+          $ref: '#/definitions/http_user_requests.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Tokens refreshed successfully
           schema:
-            $ref: '#/definitions/dto.RefreshResponse'
+            $ref: '#/definitions/http_user_responses.RefreshResponse'
         "400":
           description: Bad Request - invalid input
           schema:
@@ -109,7 +119,6 @@ paths:
           description: Internal Server Error
           schema:
             type: string
-      summary: Token refresh
   /auth/register:
     post:
       consumes:
@@ -123,14 +132,14 @@ paths:
         name: requestBody
         required: true
         schema:
-          $ref: '#/definitions/dto.RegisterRequest'
+          $ref: '#/definitions/http_user_requests.RegisterRequest'
       produces:
       - application/json
       responses:
         "200":
           description: Successfully registered new user
           schema:
-            $ref: '#/definitions/dto.RegisterResponse'
+            $ref: '#/definitions/http_user_responses.RegisterResponse'
         "400":
           description: Bad Request - invalid input
           schema:
@@ -139,5 +148,4 @@ paths:
           description: Internal Server Error
           schema:
             type: string
-      summary: Register a new user
 swagger: "2.0"
