@@ -7,7 +7,7 @@ import (
 	"auth/internal/pkg/config"
 	postgres_database "auth/internal/pkg/database/postgres"
 	http_server "auth/internal/pkg/server/http"
-	http_user_handlers "auth/internal/presentation/http/user/handlers"
+	handlers "auth/internal/presentation/http/user/handlers"
 	"context"
 	"log"
 	"log/slog"
@@ -49,7 +49,7 @@ func main() {
 	var (
 		userRepository = postgres_user_repository.NewUserRepository(postgresDatabase)
 		userService    = user_services.NewAuthService(userRepository)
-		userHandler    = http_user_handlers.NewAuthHandler(userService)
+		userHandler    = handlers.NewAuthHandler(userService)
 		router         = gin.New()
 	)
 

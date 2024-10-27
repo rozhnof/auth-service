@@ -1,6 +1,0 @@
-package http_user_responses
-
-type LoginResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-}
