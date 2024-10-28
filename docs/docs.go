@@ -17,47 +17,36 @@ const docTemplate = `{
     "paths": {
         "/auth/login": {
             "post": {
-                "description": "Logs in a user using their user_id query parameter and returns an access token and refresh token.",
+                "description": "Login user with username and password",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "operationId": "login-user",
+                "tags": [
+                    "auth"
+                ],
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "User ID",
-                        "name": "user_id",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "description": "User login details",
-                        "name": "requestBody",
+                        "description": "Login Request",
+                        "name": "login",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http_user_requests.LoginRequest"
+                            "$ref": "#/definitions/http_handlers.LoginRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successful login",
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http_user_responses.LoginResponse"
+                            "$ref": "#/definitions/http_handlers.LoginResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request - missing or invalid user_id",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found - user not found",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -73,40 +62,36 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
-                "description": "Refreshes the access token using a valid refresh token.",
+                "description": "Refreshes the access token using the refresh token",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "operationId": "refresh-token",
+                "tags": [
+                    "auth"
+                ],
                 "parameters": [
                     {
-                        "description": "Refresh token details",
-                        "name": "requestBody",
+                        "description": "Refresh Request",
+                        "name": "refresh",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http_user_requests.RefreshRequest"
+                            "$ref": "#/definitions/http_handlers.RefreshRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Tokens refreshed successfully",
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http_user_responses.RefreshResponse"
+                            "$ref": "#/definitions/http_handlers.RefreshResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request - invalid input",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized - invalid refresh token",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -122,34 +107,36 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Registers a new user by providing an email address and other necessary information.",
+                "description": "Registers a new user with username and password",
                 "consumes": [
                     "application/json"
                 ],
                 "produces": [
                     "application/json"
                 ],
-                "operationId": "register-user",
+                "tags": [
+                    "auth"
+                ],
                 "parameters": [
                     {
-                        "description": "User registration details",
-                        "name": "requestBody",
+                        "description": "Register Request",
+                        "name": "register",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/http_user_requests.RegisterRequest"
+                            "$ref": "#/definitions/http_handlers.RegisterRequest"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Successfully registered new user",
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/http_user_responses.RegisterResponse"
+                            "$ref": "#/definitions/http_handlers.RegisterResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request - invalid input",
+                        "description": "Bad Request",
                         "schema": {
                             "type": "string"
                         }
@@ -165,15 +152,18 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "http_user_requests.LoginRequest": {
+        "http_handlers.LoginRequest": {
             "type": "object",
             "properties": {
-                "email": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
         },
-        "http_user_requests.RefreshRequest": {
+        "http_handlers.LoginResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -184,15 +174,15 @@ const docTemplate = `{
                 }
             }
         },
-        "http_user_requests.RegisterRequest": {
+        "http_handlers.RefreshRequest": {
             "type": "object",
             "properties": {
-                "email": {
+                "refresh_token": {
                     "type": "string"
                 }
             }
         },
-        "http_user_responses.LoginResponse": {
+        "http_handlers.RefreshResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -203,32 +193,24 @@ const docTemplate = `{
                 }
             }
         },
-        "http_user_responses.RefreshResponse": {
+        "http_handlers.RegisterRequest": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "password": {
                     "type": "string"
                 },
-                "refresh_token": {
+                "username": {
                     "type": "string"
                 }
             }
         },
-        "http_user_responses.RegisterResponse": {
+        "http_handlers.RegisterResponse": {
             "type": "object",
             "properties": {
-                "user": {
-                    "$ref": "#/definitions/http_user_structs.User"
-                }
-            }
-        },
-        "http_user_structs.User": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
                 "id": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }

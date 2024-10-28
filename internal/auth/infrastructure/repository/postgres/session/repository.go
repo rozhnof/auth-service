@@ -29,7 +29,7 @@ func NewSessionRepository(db PostgresDatabase) *SessionRepository {
 }
 
 func (s *SessionRepository) Create(ctx context.Context, session *models.Session) (*models.Session, error) {
-	rows, err := s.db.Query(ctx, queries.Create)
+	rows, err := s.db.Query(ctx, queries.Create, session.UserID, session.RefreshToken, session.ExpiredAt, session.IsRevoked)
 	if err != nil {
 		return nil, err
 	}
@@ -41,6 +41,19 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 	}
 
 	return &createdSession, nil
+}
+
+func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken string) (*models.Session, error) {
+	var session models.Session
+
+	if err := pgxscan.Get(ctx, s.db, &session, queries.GetByRefreshToken, refreshToken); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.Wrap(repository.ErrNotExists, fmt.Sprintf("session with refresh token = %s does not exists", refreshToken))
+		}
+		return nil, err
+	}
+
+	return &session, nil
 }
 
 func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*models.Session, error) {
@@ -57,7 +70,7 @@ func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*
 }
 
 func (s *SessionRepository) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
-	rows, err := s.db.Query(ctx, queries.Create)
+	rows, err := s.db.Query(ctx, queries.Update, session.ID, session.UserID, session.RefreshToken, session.ExpiredAt, session.IsRevoked)
 	if err != nil {
 		return nil, err
 	}

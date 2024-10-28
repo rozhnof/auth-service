@@ -1,13 +1,14 @@
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(50) NOT NULL,
-    password TEXT NOT NULL,
-    refresh_token TEXT NOT NULL
+    hash_password TEXT NOT NULL
 );
 
-CREATE TABLE refresh_token (
+CREATE TABLE session (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    token TEXT NOT NULL,
-    user_id UUID REFERENCES users(id)
+    user_id UUID REFERENCES users(id),
+    refresh_token VARCHAR(77),
+    expired_at TIMESTAMP,
+    is_revoked BOOLEAN
 );
 

@@ -4,6 +4,7 @@ import (
 	"auth/internal/auth/domain/models"
 	"auth/internal/auth/domain/repository"
 	"context"
+	"log/slog"
 	"time"
 
 	"github.com/pkg/errors"
@@ -28,42 +29,41 @@ type PasswordManager interface {
 }
 
 type Dependencies struct {
-	userRepository    repository.UserRepository
-	sessionRepository repository.SessionRepository
-
-	txManager       repository.TransactionManager
-	atManager       AccessTokenManager
-	rtManager       RefreshTokenManager
-	passwordManager PasswordManager
+	UserRepository    repository.UserRepository
+	SessionRepository repository.SessionRepository
+	TxManager         repository.TransactionManager
+	AtManager         AccessTokenManager
+	RtManager         RefreshTokenManager
+	PasswordManager   PasswordManager
 }
 
 type UserService struct {
 	Dependencies
 }
 
-func NewAuthService(d Dependencies) (*UserService, error) {
+func NewUserService(d Dependencies) (*UserService, error) {
 	if err := func() error {
-		if d.userRepository == nil {
+		if d.UserRepository == nil {
 			return errors.New("user repository")
 		}
 
-		if d.sessionRepository == nil {
+		if d.SessionRepository == nil {
 			return errors.New("session repository")
 		}
 
-		if d.txManager == nil {
+		if d.TxManager == nil {
 			return errors.New("transaction manager")
 		}
 
-		if d.atManager == nil {
+		if d.AtManager == nil {
 			return errors.New("access token manager")
 		}
 
-		if d.rtManager == nil {
+		if d.RtManager == nil {
 			return errors.New("refresh token manager")
 		}
 
-		if d.passwordManager == nil {
+		if d.PasswordManager == nil {
 			return errors.New("password manager")
 		}
 
@@ -78,7 +78,7 @@ func NewAuthService(d Dependencies) (*UserService, error) {
 }
 
 func (s *UserService) Register(ctx context.Context, username string, password string) (*models.User, error) {
-	hashPassword, err := s.passwordManager.HashPassword(password)
+	hashPassword, err := s.PasswordManager.HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +88,7 @@ func (s *UserService) Register(ctx context.Context, username string, password st
 		HashPassword: hashPassword,
 	}
 
-	createdUser, err := s.userRepository.Create(ctx, &user)
+	createdUser, err := s.UserRepository.Create(ctx, &user)
 	if err != nil {
 		return nil, err
 	}
@@ -97,22 +97,22 @@ func (s *UserService) Register(ctx context.Context, username string, password st
 }
 
 func (s *UserService) Login(ctx context.Context, username string, password string) (at string, rt string, err error) {
-	if err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		user, err := s.userRepository.GetByUsername(txCtx, username)
+	if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		user, err := s.UserRepository.GetByUsername(txCtx, username)
 		if err != nil {
 			return err
 		}
 
-		if !s.passwordManager.CheckPassword(password, user.HashPassword) {
+		if !s.PasswordManager.CheckPassword(password, user.HashPassword) {
 			return ErrInvalidPassword
 		}
 
-		at, err = s.atManager.NewAccessTokenWithTTL(atTimeout)
+		at, err = s.AtManager.NewAccessTokenWithTTL(atTimeout)
 		if err != nil {
 			return err
 		}
 
-		rt, err = s.rtManager.NewRefreshToken()
+		rt, err = s.RtManager.NewRefreshToken()
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,9 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 			ExpiredAt:    time.Now().Add(rtTimeout),
 		}
 
-		if _, err := s.sessionRepository.Create(txCtx, session); err != nil {
+		slog.Debug("creating a new session", slog.Any("session", session))
+
+		if _, err := s.SessionRepository.Create(txCtx, session); err != nil {
 			return err
 		}
 
@@ -136,22 +138,24 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 }
 
 func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at string, rt string, err error) {
-	if err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		session, err := s.sessionRepository.GetByRefreshToken(txCtx, refreshToken)
+	if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		session, err := s.SessionRepository.GetByRefreshToken(txCtx, refreshToken)
 		if err != nil {
 			return err
 		}
+
+		slog.Debug("refresh session", slog.Any("session", session))
 
 		if !session.Valid() {
 			return errors.New("invalid refresh token")
 		}
 
-		at, err = s.atManager.NewAccessTokenWithTTL(atTimeout)
+		at, err = s.AtManager.NewAccessTokenWithTTL(atTimeout)
 		if err != nil {
 			return err
 		}
 
-		rt, err = s.rtManager.NewRefreshToken()
+		rt, err = s.RtManager.NewRefreshToken()
 		if err != nil {
 			return err
 		}
@@ -159,7 +163,7 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at stri
 		session.RefreshToken = rt
 		session.ExpiredAt = time.Now().Add(rtTimeout)
 
-		if _, err := s.sessionRepository.Update(txCtx, session); err != nil {
+		if _, err := s.SessionRepository.Update(txCtx, session); err != nil {
 			return err
 		}
 

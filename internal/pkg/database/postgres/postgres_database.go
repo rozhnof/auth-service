@@ -1,13 +1,21 @@
 package postgres_database
 
 import (
-	"auth/internal/pkg/config"
 	"context"
 	"fmt"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
 )
+
+type Config struct {
+	Address  string
+	Port     int
+	User     string
+	Password string
+	DB       string
+	SSL      string
+}
 
 type Database struct {
 	cluster *pgxpool.Pool
@@ -25,14 +33,14 @@ func (db Database) Close() {
 	db.cluster.Close()
 }
 
-func NewDatabase(ctx context.Context, connString string) (*Database, error) {
-	cluster, err := pgxpool.Connect(ctx, connString)
+func NewDatabase(ctx context.Context, cfg Config) (*Database, error) {
+	cluster, err := pgxpool.Connect(ctx, CreateConnectionString(cfg))
 	if err != nil {
 		return nil, err
 	}
 	return &Database{cluster: cluster}, nil
 }
 
-func CreateConnectionString(cfg config.RepositoryConfig) string {
+func CreateConnectionString(cfg Config) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s", cfg.User, cfg.Password, cfg.Address, cfg.Port, cfg.DB, cfg.SSL)
 }

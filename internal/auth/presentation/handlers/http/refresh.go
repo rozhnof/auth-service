@@ -1,22 +1,10 @@
-package handlers
+package http_handlers
 
 import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
-
-// Refresh @Summary Token refresh
-// @Description Refreshes the access token using a valid refresh token.
-// @ID refresh-token
-// @Accept  json
-// @Produce  json
-// @Param requestBody body RefreshRequest true "Refresh token details"
-// @Success 200 {object} RefreshResponse "Tokens refreshed successfully"
-// @Failure 400 {string} string "Bad Request - invalid input"
-// @Failure 401 {string} string "Unauthorized - invalid refresh token"
-// @Failure 500 {string} string "Internal Server Error"
-// @Router /auth/refresh [post]
 
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
@@ -27,6 +15,16 @@ type RefreshResponse struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+// Refresh @Summary Refresh access token
+// @Description Refreshes the access token using the refresh token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param refresh body RefreshRequest true "Refresh Request"
+// @Success 200 {object} RefreshResponse
+// @Failure 400 {string} string "Bad Request"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var request RefreshRequest
 	if err := c.ShouldBindJSON(&request); err != nil {

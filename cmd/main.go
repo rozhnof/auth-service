@@ -2,13 +2,9 @@ package main
 
 import (
 	http_app "auth/internal/app/http"
-	user_services "auth/internal/application/services/user"
-	postgres_user_repository "auth/internal/infrastructure/repository/postgres/user"
 	"auth/internal/pkg/config"
-	postgres_database "auth/internal/pkg/database/postgres"
-	http_server "auth/internal/pkg/server/http"
-	handlers "auth/internal/presentation/http/user/handlers"
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -16,8 +12,6 @@ import (
 	"syscall"
 
 	_ "auth/docs"
-
-	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -39,33 +33,39 @@ func main() {
 		log.Fatal(err)
 	}
 
-	InitLogging(cfg.Logger.Level)
+	logger := NewLogger(cfg.Logger)
+	slog.SetDefault(logger)
+	logger.Info("init logger")
 
-	postgresDatabase, err := postgres_database.NewDatabase(ctx, postgres_database.CreateConnectionString(cfg.Repository))
+	app, err := http_app.NewApp(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var (
-		userRepository = postgres_user_repository.NewUserRepository(postgresDatabase)
-		userService    = user_services.NewAuthService(userRepository)
-		userHandler    = handlers.NewAuthHandler(userService)
-		router         = gin.New()
-	)
+	logger.Info("init http application")
 
-	http_app.InitRoutes(router, userHandler)
+	go func() {
+		logger.Info(fmt.Sprintf("http application listening on address %s", cfg.Server.HTTP.Address))
 
-	log.Println("http server started successfully")
-	if err := RunHTTP(ctx, cfg, router); err != nil {
-		log.Fatal(err)
+		if err := app.Run(ctx); err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		if err := app.Stop(ctx); err != nil {
+			log.Fatalf("error in app.Stop: %s", err)
+		}
+
+		logger.Info("Gracefully stopped http server")
 	}
-	log.Println("http server stopped successfully")
 }
 
-func InitLogging(logLevel string) {
+func NewLogger(loggerConfig config.LoggerConfig) *slog.Logger {
 	var level slog.Leveler
 
-	switch logLevel {
+	switch loggerConfig.Level {
 	case "debug":
 		level = slog.LevelDebug
 	case "info":
@@ -76,24 +76,7 @@ func InitLogging(logLevel string) {
 		level = slog.LevelError
 	}
 
-	var (
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
-		logger  = slog.New(handler)
-	)
+	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
 
-	slog.SetDefault(logger)
-}
-
-func RunHTTP(ctx context.Context, cfg *config.Config, router *gin.Engine) error {
-	serverCfg := http_server.Config{
-		Address:         cfg.Server.HTTP.Address,
-		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
-	}
-
-	server := http_server.New(
-		serverCfg,
-		router,
-	)
-
-	return server.Run(ctx)
+	return slog.New(handler)
 }

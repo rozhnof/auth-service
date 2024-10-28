@@ -1,7 +1,12 @@
+ifeq ("$(wildcard .env)","")
+# .env file does not exist
+else
 include .env
 export
+endif
 
-PROJECT_NAME=song_service
+
+PROJECT_NAME=auth_service
 
 MIGRATE_CMD := $(shell which migrate)
 MIGRATE_VERSION := v4.15.2
@@ -28,6 +33,7 @@ MIGRATION_NAME := $(name)
 .PHONY: env
 env:
 	$(CREATE_DEFAULT_ENV_SCRIPT)
+	cp $(PROJECT_ROOT_PATH)/.env $(DEPLOYMENTS_PATH)/.env
 
 .PHONY: docs
 docs:

@@ -6,3 +6,6 @@ server:
 service:
   access_token_timeout: 30m
   refresh_token_timeout: 72h
+
+logging:
+  level: debug

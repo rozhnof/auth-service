@@ -9,7 +9,7 @@ const tokenLength = 77
 
 type RefreshTokenManager struct{}
 
-func NewRefreshTokenManager(secretKey []byte) *RefreshTokenManager {
+func NewRefreshTokenManager() *RefreshTokenManager {
 	return &RefreshTokenManager{}
 }
 

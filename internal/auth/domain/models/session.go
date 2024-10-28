@@ -14,6 +14,6 @@ type Session struct {
 	IsRevoked    bool      `db:"is_revoked"`
 }
 
-func (s Session) Valid() bool {
-	return s.ExpiredAt.Before(time.Now()) && !s.IsRevoked
+func (s *Session) Valid() bool {
+	return s.ExpiredAt.After(time.Now()) && !s.IsRevoked
 }

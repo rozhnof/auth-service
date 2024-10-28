@@ -1,6 +1,6 @@
 package postgres_session_queries
 
-const UpdateQuery = `
+const Update = `
 	UPDATE 
 		session 
 	SET  

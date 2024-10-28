@@ -1,46 +1,43 @@
 basePath: /
 definitions:
-  http_user_requests.LoginRequest:
+  http_handlers.LoginRequest:
     properties:
-      email:
+      password:
+        type: string
+      username:
         type: string
     type: object
-  http_user_requests.RefreshRequest:
+  http_handlers.LoginResponse:
     properties:
       access_token:
         type: string
       refresh_token:
         type: string
     type: object
-  http_user_requests.RegisterRequest:
+  http_handlers.RefreshRequest:
     properties:
-      email:
+      refresh_token:
         type: string
     type: object
-  http_user_responses.LoginResponse:
+  http_handlers.RefreshResponse:
     properties:
       access_token:
         type: string
       refresh_token:
         type: string
     type: object
-  http_user_responses.RefreshResponse:
+  http_handlers.RegisterRequest:
     properties:
-      access_token:
+      password:
         type: string
-      refresh_token:
+      username:
         type: string
     type: object
-  http_user_responses.RegisterResponse:
+  http_handlers.RegisterResponse:
     properties:
-      user:
-        $ref: '#/definitions/http_user_structs.User'
-    type: object
-  http_user_structs.User:
-    properties:
-      email:
-        type: string
       id:
+        type: string
+      username:
         type: string
     type: object
 host: localhost:8080
@@ -53,99 +50,87 @@ paths:
     post:
       consumes:
       - application/json
-      description: Logs in a user using their user_id query parameter and returns
-        an access token and refresh token.
-      operationId: login-user
+      description: Login user with username and password
       parameters:
-      - description: User ID
-        in: query
-        name: user_id
-        required: true
-        type: string
-      - description: User login details
+      - description: Login Request
         in: body
-        name: requestBody
+        name: login
         required: true
         schema:
-          $ref: '#/definitions/http_user_requests.LoginRequest'
+          $ref: '#/definitions/http_handlers.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Successful login
+          description: OK
           schema:
-            $ref: '#/definitions/http_user_responses.LoginResponse'
+            $ref: '#/definitions/http_handlers.LoginResponse'
         "400":
-          description: Bad Request - missing or invalid user_id
-          schema:
-            type: string
-        "404":
-          description: Not Found - user not found
+          description: Bad Request
           schema:
             type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      tags:
+      - auth
   /auth/refresh:
     post:
       consumes:
       - application/json
-      description: Refreshes the access token using a valid refresh token.
-      operationId: refresh-token
+      description: Refreshes the access token using the refresh token
       parameters:
-      - description: Refresh token details
+      - description: Refresh Request
         in: body
-        name: requestBody
+        name: refresh
         required: true
         schema:
-          $ref: '#/definitions/http_user_requests.RefreshRequest'
+          $ref: '#/definitions/http_handlers.RefreshRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Tokens refreshed successfully
+          description: OK
           schema:
-            $ref: '#/definitions/http_user_responses.RefreshResponse'
+            $ref: '#/definitions/http_handlers.RefreshResponse'
         "400":
-          description: Bad Request - invalid input
-          schema:
-            type: string
-        "401":
-          description: Unauthorized - invalid refresh token
+          description: Bad Request
           schema:
             type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      tags:
+      - auth
   /auth/register:
     post:
       consumes:
       - application/json
-      description: Registers a new user by providing an email address and other necessary
-        information.
-      operationId: register-user
+      description: Registers a new user with username and password
       parameters:
-      - description: User registration details
+      - description: Register Request
         in: body
-        name: requestBody
+        name: register
         required: true
         schema:
-          $ref: '#/definitions/http_user_requests.RegisterRequest'
+          $ref: '#/definitions/http_handlers.RegisterRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: Successfully registered new user
+          description: OK
           schema:
-            $ref: '#/definitions/http_user_responses.RegisterResponse'
+            $ref: '#/definitions/http_handlers.RegisterResponse'
         "400":
-          description: Bad Request - invalid input
+          description: Bad Request
           schema:
             type: string
         "500":
           description: Internal Server Error
           schema:
             type: string
+      tags:
+      - auth
 swagger: "2.0"

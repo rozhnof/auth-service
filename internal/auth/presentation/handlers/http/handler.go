@@ -1,4 +1,4 @@
-package handlers
+package http_handlers
 
 import "auth/internal/auth/application/services"
 

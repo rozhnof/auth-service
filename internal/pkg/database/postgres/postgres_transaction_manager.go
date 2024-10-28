@@ -1,7 +1,6 @@
 package postgres_database
 
 import (
-	postgres_database "auth/internal/pkg/database/postgres"
 	"context"
 
 	"github.com/jackc/pgx/v4"
@@ -17,10 +16,10 @@ type QueryEngine interface {
 }
 
 type TransactionManager struct {
-	postgres_database.Database
+	*Database
 }
 
-func NewTransactionManager(db postgres_database.Database) *TransactionManager {
+func NewTransactionManager(db *Database) *TransactionManager {
 	txManager := &TransactionManager{
 		Database: db,
 	}
@@ -40,10 +39,6 @@ func (m *TransactionManager) WithTransaction(ctx context.Context, f func(ctx con
 	}
 
 	ctxWithTx := context.WithValue(ctx, txKeyValue, tx)
-	if err := f(ctxWithTx); err != nil {
-		return err
-	}
-
 	if err := f(ctxWithTx); err != nil {
 		if errRollback := tx.Rollback(ctx); errRollback != nil {
 			// TODO

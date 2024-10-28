@@ -40,6 +40,7 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 		return nil, err
 	}
 
+	user.ID = createdUser.ID
 	if createdUser != *user {
 		return nil, errors.Wrapf(repository.ErrDuplicate, "user with email = %s already exists", user.Username)
 	}
