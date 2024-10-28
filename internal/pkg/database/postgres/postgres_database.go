@@ -13,6 +13,10 @@ type Database struct {
 	cluster *pgxpool.Pool
 }
 
+func (db Database) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
+	return db.cluster.BeginTx(ctx, txOptions)
+}
+
 func (db Database) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
 	return db.cluster.Query(ctx, sql, args...)
 }

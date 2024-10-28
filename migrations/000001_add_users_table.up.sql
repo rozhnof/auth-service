@@ -4,3 +4,10 @@ CREATE TABLE users (
     password TEXT NOT NULL,
     refresh_token TEXT NOT NULL
 );
+
+CREATE TABLE refresh_token (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    token TEXT NOT NULL,
+    user_id UUID REFERENCES users(id)
+);
+
