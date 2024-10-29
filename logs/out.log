@@ -1,0 +1,6 @@
+{"time":"2024-10-29T21:52:28.459141168+07:00","level":"INFO","msg":"starting http server"}
+{"time":"2024-10-29T21:52:58.041761379+07:00","level":"DEBUG","msg":"register user start","layer":"application","pkg":"services","function":"UserService.Register","username":"1"}
+{"time":"2024-10-29T21:52:58.088442404+07:00","level":"DEBUG","msg":"create user start","layer":"infrastructure","pkg":"postgres_user_repository","function":"UserRepository.Create","username":"1"}
+{"time":"2024-10-29T21:52:58.097703565+07:00","level":"DEBUG","msg":"create user end","layer":"infrastructure","pkg":"postgres_user_repository","function":"UserRepository.Create","username":"1"}
+{"time":"2024-10-29T21:52:58.09772197+07:00","level":"DEBUG","msg":"register user end","layer":"application","pkg":"services","function":"UserService.Register","username":"1"}
+{"time":"2024-10-29T21:54:05.140363808+07:00","level":"INFO","msg":"stopping http server"}

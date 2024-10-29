@@ -5,9 +5,10 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig `yaml:"server" env-required:"true"`
+	Server     ServerConfig  `yaml:"server"  env-required:"true"`
+	Logger     LoggerConfig  `yaml:"logging" env-required:"true"`
+	Service    ServiceConfig `yaml:"service" env-required:"true"`
 	Repository RepositoryConfig
-	Logger     LoggerConfig `yaml:"logging" env-required:"true"`
 }
 
 func NewConfig(configPath string) (*Config, error) {

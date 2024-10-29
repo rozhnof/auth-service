@@ -28,16 +28,26 @@ type LoginResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
+	log := h.log.With(
+		slog.String("function", "AuthHandler.Login"),
+	)
+
 	var request LoginRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Info("bad request")
+
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	slog.Debug("logging", slog.Any("request", request))
+	log = log.With(
+		slog.String("username", request.Username),
+	)
 
 	at, rt, err := h.userService.Login(c.Request.Context(), request.Username, request.Password)
 	if err != nil {
+		log.Info("failed user login", slog.String("error", err.Error()))
+
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}

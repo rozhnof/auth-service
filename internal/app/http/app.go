@@ -12,15 +12,15 @@ import (
 	"auth/internal/pkg/token_manager"
 	"context"
 	"github.com/gin-gonic/gin"
+	"log/slog"
 )
 
 type App struct {
 	server *http_server.HTTPServer
+	log    *slog.Logger
 }
 
-var secretKey []byte
-
-func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
+func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, error) {
 	httpServerConfig := http_server.Config{
 		Address:         cfg.Server.HTTP.Address,
 		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
@@ -43,10 +43,10 @@ func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	var (
 		transactionManager = postgres_database.NewTransactionManager(postgresDatabase)
-		userRepository     = postgres_user_repository.NewUserRepository(transactionManager)
-		sessionRepository  = postgres_session_repository.NewSessionRepository(transactionManager)
-		atManager          = token_manager.NewAccessTokenManager(secretKey)
-		rtManager          = token_manager.NewRefreshTokenManager()
+		userRepository     = postgres_user_repository.NewUserRepository(transactionManager, log)
+		sessionRepository  = postgres_session_repository.NewSessionRepository(transactionManager, log)
+		atManager          = token_manager.NewAccessTokenManager(cfg.Service.Tokens.Access.Timeout, []byte(cfg.Service.Tokens.Access.SecretKey))
+		rtManager          = token_manager.NewRefreshTokenManager(cfg.Service.Tokens.Refresh.Timeout)
 		passwordManager    = password_manager.NewPasswordManager()
 	)
 
@@ -59,12 +59,12 @@ func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
 		PasswordManager:   passwordManager,
 	}
 
-	userService, err := services.NewUserService(userServiceDependencies)
+	userService, err := services.NewUserService(userServiceDependencies, log)
 	if err != nil {
 		return nil, err
 	}
 
-	authHandler := http_handlers.NewAuthHandler(userService)
+	authHandler := http_handlers.NewAuthHandler(userService, log)
 	router := gin.New()
 
 	InitRoutes(router, authHandler)
@@ -73,13 +73,18 @@ func NewApp(ctx context.Context, cfg *config.Config) (*App, error) {
 
 	return &App{
 		server: server,
+		log:    log,
 	}, nil
 }
 
 func (a *App) Run(ctx context.Context) error {
+	a.log.Info("starting http server")
+
 	return a.server.Run(ctx)
 }
 
 func (a *App) Stop(ctx context.Context) error {
+	a.log.Info("stopping http server")
+
 	return a.server.Shutdown(ctx)
 }

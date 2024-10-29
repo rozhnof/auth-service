@@ -1,36 +1,22 @@
 package token_manager
 
 import (
+	"auth/internal/auth/domain/models"
 	"time"
-
-	"github.com/golang-jwt/jwt/v4"
 )
 
 type AccessTokenManager struct {
+	tokenTTL  time.Duration
 	secretKey []byte
 }
 
-func NewAccessTokenManager(secretKey []byte) *AccessTokenManager {
-	return &AccessTokenManager{
+func NewAccessTokenManager(tokenTTL time.Duration, secretKey []byte) AccessTokenManager {
+	return AccessTokenManager{
+		tokenTTL:  tokenTTL,
 		secretKey: secretKey,
 	}
 }
 
-func (t AccessTokenManager) NewAccessTokenWithTTL(ttl time.Duration) (string, error) {
-	expiredAt := time.Now().Add(ttl)
-
-	claims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(expiredAt),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		Issuer:    "auth-service",
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-
-	signedToken, err := token.SignedString(t.secretKey)
-	if err != nil {
-		return "", err
-	}
-
-	return signedToken, nil
+func (t AccessTokenManager) NewToken() (models.AccessToken, error) {
+	return models.NewAccessToken(t.tokenTTL, t.secretKey)
 }

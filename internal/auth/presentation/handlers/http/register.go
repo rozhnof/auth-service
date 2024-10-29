@@ -1,6 +1,7 @@
 package http_handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,14 +27,26 @@ type RegisterResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
+	log := h.log.With(
+		slog.String("function", "AuthHandler.Register"),
+	)
+
 	var request RegisterRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Info("bad request")
+
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
+	log = log.With(
+		slog.String("username", request.Username),
+	)
+
 	registeredUser, err := h.userService.Register(c.Request.Context(), request.Username, request.Password)
 	if err != nil {
+		log.Info("register failed", slog.String("error", err.Error()))
+
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}

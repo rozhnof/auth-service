@@ -4,8 +4,12 @@ server:
     shutdown_timeout: 5s
 
 service:
-  access_token_timeout: 30m
-  refresh_token_timeout: 72h
+  tokens:
+    access:
+      timeout: 30m
+    refresh:
+      timeout: 30m
 
 logging:
   level: debug
+  path: logs/out.log

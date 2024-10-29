@@ -4,7 +4,6 @@ import (
 	http_app "auth/internal/app/http"
 	"auth/internal/pkg/config"
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -33,20 +32,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	logger := NewLogger(cfg.Logger)
-	slog.SetDefault(logger)
-	logger.Info("init logger")
-
-	app, err := http_app.NewApp(ctx, cfg)
+	logger, err := NewLogger(cfg.Logger)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	logger.Info("init http application")
+	app, err := http_app.NewApp(ctx, cfg, logger)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	go func() {
-		logger.Info(fmt.Sprintf("http application listening on address %s", cfg.Server.HTTP.Address))
-
 		if err := app.Run(ctx); err != nil {
 			log.Fatal(err)
 		}
@@ -57,15 +53,13 @@ func main() {
 		if err := app.Stop(ctx); err != nil {
 			log.Fatalf("error in app.Stop: %s", err)
 		}
-
-		logger.Info("Gracefully stopped http server")
 	}
 }
 
-func NewLogger(loggerConfig config.LoggerConfig) *slog.Logger {
+func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {
 	var level slog.Leveler
 
-	switch loggerConfig.Level {
+	switch cfg.Level {
 	case "debug":
 		level = slog.LevelDebug
 	case "info":
@@ -76,7 +70,12 @@ func NewLogger(loggerConfig config.LoggerConfig) *slog.Logger {
 		level = slog.LevelError
 	}
 
-	handler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
 
-	return slog.New(handler)
+	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
+
+	return slog.New(handler), nil
 }

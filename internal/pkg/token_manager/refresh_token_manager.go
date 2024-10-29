@@ -1,27 +1,20 @@
 package token_manager
 
 import (
-	"crypto/rand"
-	"encoding/base64"
+	"auth/internal/auth/domain/models"
+	"time"
 )
 
-const tokenLength = 77
-
-type RefreshTokenManager struct{}
-
-func NewRefreshTokenManager() *RefreshTokenManager {
-	return &RefreshTokenManager{}
+type RefreshTokenManager struct {
+	tokenTTL time.Duration
 }
 
-func (t RefreshTokenManager) NewRefreshToken() (string, error) {
-	return generateRandomString(tokenLength)
-}
-
-func generateRandomString(length int) (string, error) {
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+func NewRefreshTokenManager(tokenTTL time.Duration) *RefreshTokenManager {
+	return &RefreshTokenManager{
+		tokenTTL: tokenTTL,
 	}
+}
 
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+func (t RefreshTokenManager) NewToken() (models.RefreshToken, error) {
+	return models.NewRefreshToken(t.tokenTTL)
 }

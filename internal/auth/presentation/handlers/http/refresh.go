@@ -1,6 +1,7 @@
 package http_handlers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,14 +27,22 @@ type RefreshResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
+	log := h.log.With(
+		slog.String("function", "AuthHandler.Refresh"),
+	)
+
 	var request RefreshRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
+		log.Info("bad request")
+
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
 	at, rt, err := h.userService.Refresh(c.Request.Context(), request.RefreshToken)
 	if err != nil {
+		log.Info("refresh failed", slog.String("error", err.Error()))
+
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
