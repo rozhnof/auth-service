@@ -1,18 +1,15 @@
 package main
 
 import (
+	_ "auth/docs"
 	http_app "auth/internal/app/http"
 	"auth/internal/pkg/config"
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
-	_ "auth/docs"
 )
 
 const (
@@ -76,13 +73,6 @@ func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	go func() {
-		for {
-			time.Sleep(time.Millisecond * 500)
-			fmt.Println(logFile.Sync())
-		}
-	}()
 
 	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
 

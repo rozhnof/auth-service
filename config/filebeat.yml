@@ -5,7 +5,7 @@ filebeat.inputs:
     - /var/log/auth-service.log
   tags: ["test-app"]
   scan_frequency: 1s
-  close_inactive: 1s  # Закрывать неактивные файлы через 1 секунду
+  close_inactive: 1s
   ignore_older: 0
 
 output.logstash:
