@@ -12,4 +12,4 @@ service:
 
 logging:
   level: debug
-  path: logs/out.log
+  path: logs/auth-service.log

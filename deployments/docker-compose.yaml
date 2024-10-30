@@ -14,6 +14,8 @@ services:
     env_file: ".env"
     environment:
       - POSTGRES_ADDRESS=postgres
+    labels:
+        co.elastic.logs/enabled: true
     command: >
       sh -c 'make run-service'
 
@@ -44,22 +46,30 @@ services:
     env_file: ".env"
 
   filebeat:
-    labels:
-      co.elastic.logs/enabled: false
-    user: root
-    image: docker.elastic.co/beats/filebeat:7.14.0
+    image: elastic/filebeat:7.17.25
     command: filebeat -e -strict.perms=false
+    user: root
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
     volumes:
-      - ./filebeat.docker.yml:/usr/share/filebeat/filebeat.yml
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "../logs:/var/log:ro"
+      - "../config/filebeat.yml:/usr/share/filebeat/filebeat.yml"
+
+  logstash:
+    image: elastic/logstash:7.17.25
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ../config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - 5044:5044
 
   elasticsearch:
-    labels:
-      co.elastic.logs/enabled: false
+    image: elastic/elasticsearch:7.17.25
     environment:
       - discovery.type=single-node
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.14.0
     healthcheck:
       test: ["CMD", "curl", "-s", "-f", "http://localhost:9200/_cat/health"]
       interval: 3s
@@ -69,9 +79,7 @@ services:
       - 9200:9200
 
   kibana:
-    labels:
-      co.elastic.logs/enabled: false
-    image: docker.elastic.co/kibana/kibana:7.14.0
+    image: elastic/kibana:7.17.25
     depends_on:
       elasticsearch:
         condition: service_healthy

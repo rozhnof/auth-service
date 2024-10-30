@@ -1,0 +1,12 @@
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+    - /var/log/auth-service.log
+  tags: ["test-app"]
+  scan_frequency: 1s
+  close_inactive: 1s  # Закрывать неактивные файлы через 1 секунду
+  ignore_older: 0
+
+output.logstash:
+  hosts: ["logstash:5044"]

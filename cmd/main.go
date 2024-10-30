@@ -4,11 +4,13 @@ import (
 	http_app "auth/internal/app/http"
 	"auth/internal/pkg/config"
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	_ "auth/docs"
 )
@@ -70,10 +72,17 @@ func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {
 		level = slog.LevelError
 	}
 
-	logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_SYNC, 0644)
 	if err != nil {
 		return nil, err
 	}
+
+	go func() {
+		for {
+			time.Sleep(time.Millisecond * 500)
+			fmt.Println(logFile.Sync())
+		}
+	}()
 
 	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
 
