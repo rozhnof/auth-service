@@ -11,8 +11,31 @@ import (
 	http_server "auth/internal/pkg/server/http"
 	"auth/internal/pkg/token_manager"
 	"context"
-	"github.com/gin-gonic/gin"
+	"fmt"
 	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+var (
+	requestsTotal = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests.",
+		},
+		[]string{"method"},
+	)
+	requestDuration = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name: "http_request_duration_seconds",
+			Help: "Duration of HTTP requests.",
+		},
+		[]string{"method"},
+	)
 )
 
 type App struct {
@@ -67,7 +90,11 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	authHandler := http_handlers.NewAuthHandler(userService, log)
 	router := gin.New()
 
-	InitRoutes(router, authHandler)
+	InitRoutes(router.Use(PrometheusMiddleware()), authHandler)
+
+	// Init monitoring
+	prometheus.MustRegister(requestsTotal, requestDuration)
+	go http.ListenAndServe(":9091", promhttp.Handler())
 
 	server := http_server.New(httpServerConfig, router)
 
@@ -75,6 +102,20 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		server: server,
 		log:    log,
 	}, nil
+}
+
+func PrometheusMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		fmt.Println("middleware")
+
+		c.Next()
+
+		method := c.Request.Method
+		elapsed := time.Since(start).Milliseconds()
+		requestsTotal.WithLabelValues(method).Inc()
+		requestDuration.WithLabelValues(method).Observe(float64(elapsed))
+	}
 }
 
 func (a *App) Run(ctx context.Context) error {

@@ -14,8 +14,6 @@ services:
     volumes:
       - ../:/app
     env_file: ".env"
-    environment:
-      - POSTGRES_ADDRESS=postgres
     labels:
         co.elastic.logs/enabled: true
     command: >
@@ -94,7 +92,7 @@ services:
       - 5601:5601
 
   grafana:
-    image: grafana/grafana:11.3.0
+    image: grafana/grafana:8.0.3
     depends_on:
       - prometheus
     ports:
