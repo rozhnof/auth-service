@@ -4,8 +4,10 @@ import (
 	"auth/internal/auth/domain/models"
 	"auth/internal/auth/domain/repository"
 	"context"
-	"github.com/pkg/errors"
 	"log/slog"
+	"time"
+
+	"github.com/pkg/errors"
 )
 
 type AccessTokenManager interface {
@@ -21,6 +23,8 @@ type PasswordManager interface {
 	CheckPassword(password string, hashPassword string) bool
 }
 
+const ttl = time.Second * 60
+
 type Dependencies struct {
 	UserRepository    repository.UserRepository
 	SessionRepository repository.SessionRepository
@@ -28,6 +32,7 @@ type Dependencies struct {
 	AtManager         AccessTokenManager
 	RtManager         RefreshTokenManager
 	PasswordManager   PasswordManager
+	Cache             repository.UserCache
 }
 
 func (d Dependencies) Valid() error {
@@ -53,6 +58,10 @@ func (d Dependencies) Valid() error {
 
 	if d.PasswordManager == nil {
 		return errors.New("missing password manager")
+	}
+
+	if d.Cache == nil {
+		return errors.New("missing cache")
 	}
 
 	return nil
@@ -119,14 +128,7 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 
 	log.Debug("login user start")
 
-	if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		user, err := s.UserRepository.GetByUsername(txCtx, username)
-		if err != nil {
-			log.Info("failed to get user", slog.Any("error", err.Error()))
-
-			return err
-		}
-
+	createUserSession := func(ctx context.Context, user *models.User) error {
 		if !s.PasswordManager.CheckPassword(password, user.HashPassword) {
 			log.Info("invalid password")
 
@@ -154,7 +156,7 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 
 		slog.Debug("creating a new session", slog.Any("session", session))
 
-		if _, err := s.SessionRepository.Create(txCtx, session); err != nil {
+		if _, err := s.SessionRepository.Create(ctx, session); err != nil {
 			log.Info("failed to create session", slog.Any("error", err.Error()))
 
 			return err
@@ -164,8 +166,46 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 		rt = refreshToken.Token
 
 		return nil
-	}); err != nil {
-		return "", "", err
+	}
+
+	user, err := s.Cache.Get(ctx, username)
+	if err == nil {
+		if err := createUserSession(ctx, &user); err != nil {
+			return "", "", err
+		}
+
+		go func() {
+			ctxWithTimeout, _ := context.WithTimeout(context.Background(), time.Second*5)
+			if err := s.Cache.Set(ctxWithTimeout, username, user, ttl); err != nil {
+				log.Info("failed add user to cache", slog.String("error", err.Error()))
+			}
+		}()
+	} else {
+		log.Info("cache miss")
+
+		if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
+			user, err := s.UserRepository.GetByUsername(txCtx, username)
+			if err != nil {
+				log.Info("failed to get user", slog.Any("error", err.Error()))
+
+				return err
+			}
+
+			if err := createUserSession(txCtx, user); err != nil {
+				return err
+			}
+
+			go func() {
+				ctxWithTimeout, _ := context.WithTimeout(context.Background(), time.Second*5)
+				if err := s.Cache.Set(ctxWithTimeout, username, *user, ttl); err != nil {
+					log.Info("failed add user to cache", slog.String("error", err.Error()))
+				}
+			}()
+
+			return nil
+		}); err != nil {
+			return "", "", err
+		}
 	}
 
 	log.Debug("login user end")

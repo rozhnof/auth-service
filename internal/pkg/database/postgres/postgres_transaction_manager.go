@@ -29,7 +29,7 @@ func NewTransactionManager(db *Database) *TransactionManager {
 
 func (m *TransactionManager) WithTransaction(ctx context.Context, f func(ctx context.Context) error) error {
 	txOptions := pgx.TxOptions{
-		IsoLevel:   pgx.Serializable,
+		IsoLevel:   pgx.ReadCommitted,
 		AccessMode: pgx.ReadWrite,
 	}
 

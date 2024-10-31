@@ -9,6 +9,7 @@ type Config struct {
 	Logger     LoggerConfig  `yaml:"logging" env-required:"true"`
 	Service    ServiceConfig `yaml:"service" env-required:"true"`
 	Repository RepositoryConfig
+	Cache      CacheConfig
 }
 
 func NewConfig(configPath string) (*Config, error) {

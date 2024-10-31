@@ -16,3 +16,9 @@ type UserRepository interface {
 	Update(ctx context.Context, user *models.User) (*models.User, error)
 	Delete(ctx context.Context, userID uuid.UUID) (*time.Time, error)
 }
+
+type UserCache interface {
+	Get(ctx context.Context, key string) (models.User, error)
+	Set(ctx context.Context, key string, value models.User, ttl time.Duration) error
+	Delete(ctx context.Context, key string) error
+}

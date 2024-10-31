@@ -2,6 +2,7 @@ package http_app
 
 import (
 	"auth/internal/auth/application/services"
+	redis_cache "auth/internal/auth/infrastructure/cache/redis"
 	postgres_session_repository "auth/internal/auth/infrastructure/repository/postgres/session"
 	postgres_user_repository "auth/internal/auth/infrastructure/repository/postgres/user"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
@@ -11,14 +12,12 @@ import (
 	http_server "auth/internal/pkg/server/http"
 	"auth/internal/pkg/token_manager"
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -41,6 +40,7 @@ var (
 type App struct {
 	server *http_server.HTTPServer
 	log    *slog.Logger
+	router *gin.Engine
 }
 
 func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, error) {
@@ -64,6 +64,22 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		return nil, err
 	}
 
+	redisConfig := redis_cache.RedisConfig{
+		Address:      cfg.Cache.Redis.Address,
+		Port:         cfg.Cache.Redis.Port,
+		User:         cfg.Cache.Redis.User,
+		Password:     cfg.Cache.Redis.Password,
+		UserPassword: cfg.Cache.Redis.UserPassword,
+		DB:           cfg.Cache.Redis.DB,
+	}
+
+	redis, err := redis_cache.NewRedis(ctx, redisConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	userCache := redis_cache.NewUserCache(redis)
+
 	var (
 		transactionManager = postgres_database.NewTransactionManager(postgresDatabase)
 		userRepository     = postgres_user_repository.NewUserRepository(transactionManager, log)
@@ -80,6 +96,7 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		AtManager:         atManager,
 		RtManager:         rtManager,
 		PasswordManager:   passwordManager,
+		Cache:             userCache,
 	}
 
 	userService, err := services.NewUserService(userServiceDependencies, log)
@@ -93,21 +110,25 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	InitRoutes(router.Use(PrometheusMiddleware()), authHandler)
 
 	// Init monitoring
-	prometheus.MustRegister(requestsTotal, requestDuration)
-	go http.ListenAndServe(":9091", promhttp.Handler())
+	//prometheus.MustRegister(requestsTotal, requestDuration)
+	//go http.ListenAndServe(":9091", promhttp.Handler())
 
 	server := http_server.New(httpServerConfig, router)
 
 	return &App{
 		server: server,
 		log:    log,
+		router: router,
 	}, nil
+}
+
+func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	a.router.ServeHTTP(w, req)
 }
 
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		fmt.Println("middleware")
 
 		c.Next()
 
