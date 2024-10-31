@@ -3,7 +3,7 @@ filebeat.inputs:
   enabled: true
   paths:
     - /var/log/auth-service.log
-  tags: ["test-app"]
+  tags: ["auth-service"]
   scan_frequency: 1s
   close_inactive: 1s
   ignore_older: 0
