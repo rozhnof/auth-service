@@ -32,7 +32,8 @@ type Dependencies struct {
 	AtManager         AccessTokenManager
 	RtManager         RefreshTokenManager
 	PasswordManager   PasswordManager
-	Cache             repository.UserCache
+	UserCache         repository.UserCache
+	SessionCache      repository.SessionCache
 }
 
 func (d Dependencies) Valid() error {
@@ -44,9 +45,9 @@ func (d Dependencies) Valid() error {
 		return errors.New("missing session repository")
 	}
 
-	if d.TxManager == nil {
-		return errors.New("missing transaction manager")
-	}
+	// if d.TxManager == nil {
+	// 	return errors.New("missing transaction manager")
+	// }
 
 	if d.AtManager == nil {
 		return errors.New("missing access token manager")
@@ -60,8 +61,12 @@ func (d Dependencies) Valid() error {
 		return errors.New("missing password manager")
 	}
 
-	if d.Cache == nil {
-		return errors.New("missing cache")
+	if d.UserCache == nil {
+		return errors.New("missing user cache")
+	}
+
+	if d.SessionCache == nil {
+		return errors.New("missing session cache")
 	}
 
 	return nil
@@ -128,84 +133,66 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 
 	log.Debug("login user start")
 
-	createUserSession := func(ctx context.Context, user *models.User) error {
-		if !s.PasswordManager.CheckPassword(password, user.HashPassword) {
-			log.Info("invalid password")
-
-			return ErrInvalidPassword
+	getUser := func(username string) (*models.User, error) {
+		if cacheUser, err := s.UserCache.Get(ctx, username); err == nil {
+			return &cacheUser, nil
 		}
 
-		accessToken, err := s.AtManager.NewToken()
-		if err != nil {
-			log.Error("failed to create access token", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		refreshToken, err := s.RtManager.NewToken()
-		if err != nil {
-			log.Error("failed to create refresh token", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		session := &models.Session{
-			UserID:       user.ID,
-			RefreshToken: refreshToken,
-		}
-
-		slog.Debug("creating a new session", slog.Any("session", session))
-
-		if _, err := s.SessionRepository.Create(ctx, session); err != nil {
-			log.Info("failed to create session", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		at = accessToken.Token
-		rt = refreshToken.Token
-
-		return nil
-	}
-
-	user, err := s.Cache.Get(ctx, username)
-	if err == nil {
-		if err := createUserSession(ctx, &user); err != nil {
-			return "", "", err
-		}
-
-		go func() {
-			ctxWithTimeout, _ := context.WithTimeout(context.Background(), time.Second*5)
-			if err := s.Cache.Set(ctxWithTimeout, username, user, ttl); err != nil {
-				log.Info("failed add user to cache", slog.String("error", err.Error()))
-			}
-		}()
-	} else {
 		log.Info("cache miss")
 
-		if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
-			user, err := s.UserRepository.GetByUsername(txCtx, username)
-			if err != nil {
-				log.Info("failed to get user", slog.Any("error", err.Error()))
-
-				return err
-			}
-
-			if err := createUserSession(txCtx, user); err != nil {
-				return err
-			}
-
-			go func() {
-				ctxWithTimeout, _ := context.WithTimeout(context.Background(), time.Second*5)
-				if err := s.Cache.Set(ctxWithTimeout, username, *user, ttl); err != nil {
-					log.Info("failed add user to cache", slog.String("error", err.Error()))
-				}
-			}()
-
-			return nil
-		}); err != nil {
-			return "", "", err
+		dbUser, err := s.UserRepository.GetByUsername(ctx, username)
+		if err != nil {
+			return nil, err
 		}
+
+		return dbUser, nil
+	}
+
+	user, err := getUser(username)
+	if err != nil {
+		log.Info("failed to get user", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	if !s.PasswordManager.CheckPassword(password, user.HashPassword) {
+		log.Info("invalid password")
+
+		return "", "", ErrInvalidPassword
+	}
+
+	accessToken, err := s.AtManager.NewToken()
+	if err != nil {
+		log.Error("failed to create access token", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	refreshToken, err := s.RtManager.NewToken()
+	if err != nil {
+		log.Error("failed to create refresh token", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	session := &models.Session{
+		UserID:       user.ID,
+		RefreshToken: refreshToken,
+	}
+
+	slog.Debug("creating a new session", slog.Any("session", session))
+
+	if _, err := s.SessionRepository.Create(ctx, session); err != nil {
+		log.Info("failed to create session", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	at = accessToken.Token
+	rt = refreshToken.Token
+
+	if err := s.UserCache.Set(ctx, username, *user, ttl); err != nil {
+		log.Info("failed add user to cache", slog.String("error", err.Error()))
 	}
 
 	log.Debug("login user end")
@@ -220,51 +207,45 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at stri
 
 	log.Debug("refresh tokens start")
 
-	if err := s.TxManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		session, err := s.SessionRepository.GetByRefreshToken(txCtx, refreshToken)
-		if err != nil {
-			log.Info("failed to get session", slog.Any("error", err.Error()))
+	session, err := s.SessionRepository.GetByRefreshToken(ctx, refreshToken)
+	if err != nil {
+		log.Info("failed to get session", slog.Any("error", err.Error()))
 
-			return err
-		}
-
-		log.Debug("refresh session", slog.Any("session", session))
-
-		if !session.Valid() {
-			log.Info("session is unavailable", slog.Any("session", session))
-
-			return ErrUnauthorizedRefresh
-		}
-
-		newAccessToken, err := s.AtManager.NewToken()
-		if err != nil {
-			log.Error("failed to create access token", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		newRefreshToken, err := s.RtManager.NewToken()
-		if err != nil {
-			log.Error("failed to create refresh token", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		session.RefreshToken = newRefreshToken
-
-		if _, err := s.SessionRepository.Update(txCtx, session); err != nil {
-			log.Info("failed to update session", slog.Any("error", err.Error()))
-
-			return err
-		}
-
-		at = newAccessToken.Token
-		rt = newRefreshToken.Token
-
-		return nil
-	}); err != nil {
 		return "", "", err
 	}
+
+	log.Debug("refresh session", slog.Any("session", session))
+
+	if !session.Valid() {
+		log.Info("session is unavailable", slog.Any("session", session))
+
+		return "", "", ErrUnauthorizedRefresh
+	}
+
+	newAccessToken, err := s.AtManager.NewToken()
+	if err != nil {
+		log.Error("failed to create access token", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	newRefreshToken, err := s.RtManager.NewToken()
+	if err != nil {
+		log.Error("failed to create refresh token", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	session.RefreshToken = newRefreshToken
+
+	if _, err := s.SessionRepository.Update(ctx, session); err != nil {
+		log.Info("failed to update session", slog.Any("error", err.Error()))
+
+		return "", "", err
+	}
+
+	at = newAccessToken.Token
+	rt = newRefreshToken.Token
 
 	log.Debug("refresh tokens end")
 

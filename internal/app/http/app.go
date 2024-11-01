@@ -78,7 +78,10 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		return nil, err
 	}
 
-	userCache := redis_cache.NewUserCache(redis)
+	var (
+		userCache    = redis_cache.NewUserCache(redis)
+		sessionCache = redis_cache.NewSessionCache(redis)
+	)
 
 	var (
 		transactionManager = postgres_database.NewTransactionManager(postgresDatabase)
@@ -96,7 +99,8 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		AtManager:         atManager,
 		RtManager:         rtManager,
 		PasswordManager:   passwordManager,
-		Cache:             userCache,
+		UserCache:         userCache,
+		SessionCache:      sessionCache,
 	}
 
 	userService, err := services.NewUserService(userServiceDependencies, log)

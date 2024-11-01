@@ -15,3 +15,9 @@ type SessionRepository interface {
 	Update(ctx context.Context, session *models.Session) (*models.Session, error)
 	Delete(ctx context.Context, sessionID uuid.UUID) (*time.Time, error)
 }
+
+type SessionCache interface {
+	Get(ctx context.Context, key string) (models.Session, error)
+	Set(ctx context.Context, key string, value models.Session, ttl time.Duration) error
+	Delete(ctx context.Context, key string) error
+}

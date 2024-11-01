@@ -11,6 +11,8 @@ import (
 
 	"github.com/georgysavva/scany/pgxscan"
 	"github.com/google/uuid"
+	"github.com/jackc/pgconn"
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v4"
 	"github.com/pkg/errors"
 )
@@ -42,7 +44,7 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 		slog.String("username", user.Username),
 	)
 
-	log.Debug("create user start")
+	log.Debug("create user start", slog.String("password", user.HashPassword))
 
 	rows, err := s.db.Query(ctx, queries.Create, user.Username, user.HashPassword)
 	if err != nil {
@@ -54,14 +56,15 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 
 	var createdUser models.User
 	if err := pgxscan.ScanOne(&createdUser, rows); err != nil {
+		var pgErr *pgconn.PgError
+
 		log.Info("scan rows error", slog.Any("error", err.Error()))
 
-		return nil, err
-	}
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			return nil, errors.Wrapf(repository.ErrDuplicate, "user with username = %s already exists", user.Username)
+		}
 
-	user.ID = createdUser.ID
-	if createdUser != *user {
-		return nil, errors.Wrapf(repository.ErrDuplicate, "user with email = %s already exists", user.Username)
+		return nil, err
 	}
 
 	log.Debug("create user end")
