@@ -1,3 +1,5 @@
+mode: debug # debug, release
+
 server:
   http:
     address: :8080

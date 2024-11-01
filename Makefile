@@ -14,7 +14,8 @@ MIGRATE_VERSION := v4.15.2
 TEST_CMD := $(shell which gotestsum)
 
 PROJECT_ROOT_PATH=$(CURDIR)
-SERVICE_PATH=$(PROJECT_ROOT_PATH)/cmd/main.go
+SERVICE_PATH_RELATIVE=cmd/http/main.go
+SERVICE_PATH=$(PROJECT_ROOT_PATH)/$(SERVICE_PATH_RELATIVE)
 MIGRATION_PATH=$(PROJECT_ROOT_PATH)/migrations
 
 SCRIPTS_PATH=$(PROJECT_ROOT_PATH)/scripts
@@ -43,7 +44,7 @@ local-env:
 
 .PHONY: docs
 docs:
-	swag init -g ./cmd/main.go
+	swag init -g $(SERVICE_PATH_RELATIVE)
 
 build-service:
 	docker-compose -p $(PROJECT_NAME) -f $(DOCKER_COMPOSE_PATH) build 

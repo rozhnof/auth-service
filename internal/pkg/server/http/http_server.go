@@ -3,7 +3,6 @@ package http_server
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"net/http"
 	"time"
 )
@@ -33,49 +32,11 @@ func New(cfg Config, handler http.Handler) *HTTPServer {
 }
 
 func (s *HTTPServer) Run(ctx context.Context) error {
-	var listenAndServeErr error
-	go func() {
-		if err := s.srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			listenAndServeErr = err
-		}
-	}()
-
-	<-ctx.Done()
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
-	defer cancel()
-
-	if err := s.srv.Shutdown(shutdownCtx); err != nil {
-		if listenAndServeErr != nil {
-			return errors.Join(err, listenAndServeErr)
-		}
-		return err
-	}
-
-	return nil
+	return s.srv.ListenAndServe()
 }
 
 func (s *HTTPServer) RunTLS(ctx context.Context) error {
-	var listenAndServeErr error
-	go func() {
-		if err := s.srv.ListenAndServeTLS("", ""); !errors.Is(err, http.ErrServerClosed) {
-			listenAndServeErr = err
-		}
-	}()
-
-	<-ctx.Done()
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), s.cfg.ShutdownTimeout)
-	defer cancel()
-
-	if err := s.srv.Shutdown(shutdownCtx); err != nil {
-		if listenAndServeErr != nil {
-			return errors.Join(err, listenAndServeErr)
-		}
-		return err
-	}
-
-	return nil
+	return s.srv.ListenAndServeTLS("", "")
 }
 
 func (s *HTTPServer) Shutdown(ctx context.Context) error {

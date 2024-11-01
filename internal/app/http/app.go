@@ -12,9 +12,9 @@ import (
 	http_server "auth/internal/pkg/server/http"
 	"auth/internal/pkg/token_manager"
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -44,52 +44,34 @@ type App struct {
 }
 
 func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, error) {
-	httpServerConfig := http_server.Config{
-		Address:         cfg.Server.HTTP.Address,
-		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
-		TLSConfig:       nil,
-	}
-
-	databaseConfig := postgres_database.Config{
-		Address:  cfg.Repository.Address,
-		Port:     cfg.Repository.Port,
-		User:     cfg.Repository.User,
-		Password: cfg.Repository.Password,
-		DB:       cfg.Repository.DB,
-		SSL:      cfg.Repository.SSL,
-	}
-
-	postgresDatabase, err := postgres_database.NewDatabase(ctx, databaseConfig)
+	postgresDatabase, err := InitPostgresDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	redisConfig := redis_cache.RedisConfig{
-		Address:      cfg.Cache.Redis.Address,
-		Port:         cfg.Cache.Redis.Port,
-		User:         cfg.Cache.Redis.User,
-		Password:     cfg.Cache.Redis.Password,
-		UserPassword: cfg.Cache.Redis.UserPassword,
-		DB:           cfg.Cache.Redis.DB,
-	}
-
-	redis, err := redis_cache.NewRedis(ctx, redisConfig)
+	redisCache, err := InitRedisCache(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		userCache    = redis_cache.NewUserCache(redis)
-		sessionCache = redis_cache.NewSessionCache(redis)
+		userCache    = redis_cache.NewUserCache(redisCache)
+		sessionCache = redis_cache.NewSessionCache(redisCache)
 	)
 
 	var (
 		transactionManager = postgres_database.NewTransactionManager(postgresDatabase)
-		userRepository     = postgres_user_repository.NewUserRepository(transactionManager, log)
-		sessionRepository  = postgres_session_repository.NewSessionRepository(transactionManager, log)
-		atManager          = token_manager.NewAccessTokenManager(cfg.Service.Tokens.Access.Timeout, []byte(cfg.Service.Tokens.Access.SecretKey))
-		rtManager          = token_manager.NewRefreshTokenManager(cfg.Service.Tokens.Refresh.Timeout)
-		passwordManager    = password_manager.NewPasswordManager()
+	)
+
+	var (
+		userRepository    = postgres_user_repository.NewUserRepository(transactionManager, log)
+		sessionRepository = postgres_session_repository.NewSessionRepository(transactionManager, log)
+	)
+
+	var (
+		atManager       = token_manager.NewAccessTokenManager(cfg.Service.Tokens.Access.Timeout, []byte(cfg.Service.Tokens.Access.SecretKey))
+		rtManager       = token_manager.NewRefreshTokenManager(cfg.Service.Tokens.Refresh.Timeout)
+		passwordManager = password_manager.NewPasswordManager()
 	)
 
 	userServiceDependencies := services.Dependencies{
@@ -108,16 +90,37 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		return nil, err
 	}
 
-	authHandler := http_handlers.NewAuthHandler(userService, log)
-	router := gin.New()
+	var (
+		authHandler = http_handlers.NewAuthHandler(userService, log)
+	)
 
-	InitRoutes(router.Use(PrometheusMiddleware()), authHandler)
+	if cfg.Mode == "debug" {
+		gin.SetMode(gin.DebugMode)
+	} else if cfg.Mode == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	} else {
+		return nil, fmt.Errorf("invalid mode: %s", cfg.Mode)
+	}
+
+	var (
+		router = gin.New()
+	)
+
+	middlewareList := []gin.HandlerFunc{
+		PrometheusMiddleware(),
+		LogMiddleware(log),
+	}
+	router.Use(middlewareList...)
+
+	InitAuthRoutes(router, authHandler)
 
 	// Init monitoring
 	//prometheus.MustRegister(requestsTotal, requestDuration)
 	//go http.ListenAndServe(":9091", promhttp.Handler())
 
-	server := http_server.New(httpServerConfig, router)
+	var (
+		server = InitHTTPServer(cfg, router)
+	)
 
 	return &App{
 		server: server,
@@ -130,19 +133,6 @@ func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	a.router.ServeHTTP(w, req)
 }
 
-func PrometheusMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-
-		c.Next()
-
-		method := c.Request.Method
-		elapsed := time.Since(start).Milliseconds()
-		requestsTotal.WithLabelValues(method).Inc()
-		requestDuration.WithLabelValues(method).Observe(float64(elapsed))
-	}
-}
-
 func (a *App) Run(ctx context.Context) error {
 	a.log.Info("starting http server")
 
@@ -153,4 +143,40 @@ func (a *App) Stop(ctx context.Context) error {
 	a.log.Info("stopping http server")
 
 	return a.server.Shutdown(ctx)
+}
+
+func InitPostgresDatabase(ctx context.Context, cfg *config.Config) (*postgres_database.Database, error) {
+	databaseConfig := postgres_database.Config{
+		Address:  cfg.Repository.Address,
+		Port:     cfg.Repository.Port,
+		User:     cfg.Repository.User,
+		Password: cfg.Repository.Password,
+		DB:       cfg.Repository.DB,
+		SSL:      cfg.Repository.SSL,
+	}
+
+	return postgres_database.NewDatabase(ctx, databaseConfig)
+}
+
+func InitRedisCache(ctx context.Context, cfg *config.Config) (*redis_cache.Redis, error) {
+	redisConfig := redis_cache.RedisConfig{
+		Address:      cfg.Cache.Redis.Address,
+		Port:         cfg.Cache.Redis.Port,
+		User:         cfg.Cache.Redis.User,
+		Password:     cfg.Cache.Redis.Password,
+		UserPassword: cfg.Cache.Redis.UserPassword,
+		DB:           cfg.Cache.Redis.DB,
+	}
+
+	return redis_cache.NewRedis(ctx, redisConfig)
+}
+
+func InitHTTPServer(cfg *config.Config, handler http.Handler) *http_server.HTTPServer {
+	httpServerConfig := http_server.Config{
+		Address:         cfg.Server.HTTP.Address,
+		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
+		TLSConfig:       nil,
+	}
+
+	return http_server.New(httpServerConfig, handler)
 }

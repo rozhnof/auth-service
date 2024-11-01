@@ -5,6 +5,7 @@ import (
 )
 
 type Config struct {
+	Mode       string        `yaml:"mode" env-required:"true"`
 	Server     ServerConfig  `yaml:"server"  env-required:"true"`
 	Logger     LoggerConfig  `yaml:"logging" env-required:"true"`
 	Service    ServiceConfig `yaml:"service" env-required:"true"`

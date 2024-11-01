@@ -47,13 +47,10 @@ func main() {
 		}
 	}()
 
-	select {
-	case <-ctx.Done():
-		if err := app.Stop(ctx); err != nil {
-			log.Fatalf("error in app.Stop: %s", err)
-		}
+	<-ctx.Done()
+	if err := app.Stop(ctx); err != nil {
+		log.Fatalf("error in app.Stop: %s", err)
 	}
-
 }
 
 func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {

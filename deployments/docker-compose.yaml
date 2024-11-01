@@ -1,6 +1,5 @@
 services:
   http:
-    container_name: http_auth_service
     build:
       context: ../
       dockerfile: build/docker/Dockerfile
@@ -23,7 +22,6 @@ services:
 
 
   postgres:
-    container_name: auth_db
     image: postgres:13
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -37,7 +35,6 @@ services:
     env_file: ".env"
 
   migrate:
-    container_name: auth_db_migrate
     image: migrate/migrate:4
     command: -path=../migrations/ -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}" up
     depends_on:
@@ -136,7 +133,6 @@ services:
 
   redis:
     image: redis:latest
-    container_name: pickup_point_redis
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_USER=${REDIS_USER}
