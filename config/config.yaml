@@ -10,7 +10,7 @@ service:
     access:
       timeout: 30m
     refresh:
-      timeout: 30m
+      timeout: 72h
 
 logging:
   level: debug
