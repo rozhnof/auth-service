@@ -77,6 +77,8 @@ services:
       interval: 3s
       timeout: 3s
       retries: 80
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
     ports:
       - 9200:9200
 
@@ -95,6 +97,13 @@ services:
 
   grafana:
     image: grafana/grafana:8.0.3
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ENABLE_BASIC_AUTH=false
+      - GF_SECURITY_DISABLE_LOGIN_FORM=true
+    volumes:
+      - ../deployments/data/grafana:/var/lib/grafana
     depends_on:
       - prometheus
     ports:
@@ -135,7 +144,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - ../redisdata:/data
+      - redis-data:/data
     deploy:
       resources:
         limits:
@@ -166,3 +175,5 @@ services:
 
 volumes:
   postgres_data:
+  redis-data:
+  esdata:

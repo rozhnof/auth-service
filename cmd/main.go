@@ -70,7 +70,12 @@ func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {
 		level = slog.LevelError
 	}
 
-	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level})
+	logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_SYNC, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
 
 	return slog.New(handler), nil
 }

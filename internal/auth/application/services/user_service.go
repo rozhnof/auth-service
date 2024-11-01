@@ -45,9 +45,9 @@ func (d Dependencies) Valid() error {
 		return errors.New("missing session repository")
 	}
 
-	// if d.TxManager == nil {
-	// 	return errors.New("missing transaction manager")
-	// }
+	if d.TxManager == nil {
+		return errors.New("missing transaction manager")
+	}
 
 	if d.AtManager == nil {
 		return errors.New("missing access token manager")
