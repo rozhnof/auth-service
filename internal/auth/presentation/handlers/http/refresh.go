@@ -1,6 +1,8 @@
 package http_handlers
 
 import (
+	"auth/internal/auth/application/services"
+	"github.com/pkg/errors"
 	"log/slog"
 	"net/http"
 
@@ -24,6 +26,7 @@ type RefreshResponse struct {
 // @Param refresh body RefreshRequest true "Refresh Request"
 // @Success 200 {object} RefreshResponse
 // @Failure 400 {string} string "Bad Request"
+// @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
@@ -42,6 +45,11 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	at, rt, err := h.userService.Refresh(c.Request.Context(), request.RefreshToken)
 	if err != nil {
 		log.Info("refresh failed", slog.String("error", err.Error()))
+
+		if errors.Is(err, services.ErrUnauthorizedRefresh) {
+			c.String(http.StatusUnauthorized, "invalid refresh token")
+			return
+		}
 
 		c.String(http.StatusInternalServerError, err.Error())
 		return

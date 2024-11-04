@@ -1,6 +1,8 @@
 package http_handlers
 
 import (
+	"auth/internal/auth/application/services"
+	"github.com/pkg/errors"
 	"log/slog"
 	"net/http"
 
@@ -47,6 +49,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	at, rt, err := h.userService.Login(c.Request.Context(), request.Username, request.Password)
 	if err != nil {
 		log.Info("failed user login", slog.String("error", err.Error()))
+
+		if errors.Is(err, services.ErrInvalidPassword) {
+			c.String(http.StatusOK, "invalid username or password")
+			return
+		}
 
 		c.String(http.StatusInternalServerError, err.Error())
 		return
