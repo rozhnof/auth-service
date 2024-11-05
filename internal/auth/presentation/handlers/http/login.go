@@ -32,7 +32,7 @@ type LoginResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
-	ctx, span := otel.Tracer("tracerName").Start(c.Request.Context(), "Refresh User")
+	ctx, span := otel.Tracer("auth-handler").Start(c.Request.Context(), "AuthHandler.Login")
 	defer span.End()
 
 	log := h.log.With(

@@ -165,6 +165,7 @@ services:
     image: jaegertracing/all-in-one:1.35
     ports:
       - "4318:4318"
+      - "14268:14268"
       - "16686:16686"
 
 volumes:

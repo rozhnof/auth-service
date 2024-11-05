@@ -203,6 +203,7 @@ func InitTracer(ctx context.Context, name string) (func(ctx context.Context) err
 	exporter, err := otlptracehttp.New(
 		ctx,
 		otlptracehttp.WithInsecure(),
+		otlptracehttp.WithEndpoint("http://jaeger:14268/api/traces"), // Убедитесь, что endpoint правильный
 	)
 	if err != nil {
 		return nil, err
