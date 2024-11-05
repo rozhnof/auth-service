@@ -5,7 +5,6 @@ import (
 	redis_cache "auth/internal/auth/infrastructure/cache/redis"
 	postgres_session_repository "auth/internal/auth/infrastructure/repository/postgres/session"
 	postgres_user_repository "auth/internal/auth/infrastructure/repository/postgres/user"
-	"auth/internal/auth/infrastructure/tracer"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
 	"auth/internal/pkg/config"
 	postgres_database "auth/internal/pkg/database/postgres"
@@ -21,6 +20,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 )
 
 var (
@@ -41,8 +45,7 @@ var (
 )
 
 const (
-	jaegerURL   = "localhost:4318"
-	serviceName = "Auth Service"
+	serviceName = "auth-service"
 )
 
 type App struct {
@@ -62,7 +65,7 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		return nil, err
 	}
 
-	shutdown, err := InitTracer(ctx, jaegerURL, serviceName)
+	shutdown, err := InitTracer(ctx, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -196,18 +199,34 @@ func InitHTTPServer(cfg *config.Config, handler http.Handler) *http_server.HTTPS
 	return http_server.New(httpServerConfig, handler)
 }
 
-func InitTracer(ctx context.Context, jaegerURL string, name string) (func(ctx context.Context) error, error) {
-	exporter, err := tracer.NewJaegerExporter(ctx, jaegerURL)
+func InitTracer(ctx context.Context, name string) (func(ctx context.Context) error, error) {
+	exporter, err := otlptracehttp.New(
+		ctx,
+		otlptracehttp.WithInsecure(),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("initialize exporter: %w", err)
+		return nil, err
 	}
 
-	provider, err := tracer.NewTraceProvider(exporter, name)
+	resources, err := resource.Merge(
+		resource.Default(),
+		resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(serviceName),
+		),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("initialize provider: %w", err)
+		return nil, err
 	}
+
+	provider := trace.NewTracerProvider(
+		trace.WithBatcher(exporter),
+		trace.WithResource(resources),
+	)
 
 	otel.SetTracerProvider(provider)
+
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	return provider.Shutdown, nil
 }
