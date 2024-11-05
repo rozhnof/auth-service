@@ -3,6 +3,7 @@ package http_server
 import (
 	"context"
 	"crypto/tls"
+	"net"
 	"net/http"
 	"time"
 )
@@ -18,12 +19,15 @@ type HTTPServer struct {
 	cfg Config
 }
 
-func New(cfg Config, handler http.Handler) *HTTPServer {
+func New(ctx context.Context, cfg Config, handler http.Handler) *HTTPServer {
 	s := &HTTPServer{
 		srv: &http.Server{
-			Addr:      cfg.Address,
-			TLSConfig: cfg.TLSConfig,
-			Handler:   handler,
+			Addr:         cfg.Address,
+			TLSConfig:    cfg.TLSConfig,
+			Handler:      handler,
+			BaseContext:  func(l net.Listener) context.Context { return ctx },
+			ReadTimeout:  time.Second,
+			WriteTimeout: 10 * time.Second,
 		},
 		cfg: cfg,
 	}

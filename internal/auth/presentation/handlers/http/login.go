@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,8 +31,8 @@ type LoginResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
-	ctx, span := otel.Tracer("auth-handler").Start(c.Request.Context(), "AuthHandler.Login")
-	defer span.End()
+	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Login")
+	span.End()
 
 	log := h.log.With(
 		slog.String("function", "AuthHandler.Login"),

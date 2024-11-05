@@ -13,18 +13,20 @@ import (
 	"auth/internal/pkg/token_manager"
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -43,6 +45,8 @@ var (
 		[]string{"method"},
 	)
 )
+
+var tracer trace.Tracer
 
 const (
 	serviceName = "auth-service"
@@ -65,7 +69,7 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		return nil, err
 	}
 
-	shutdown, err := InitTracer(ctx, serviceName)
+	shutdown, err := InitTracer(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -102,13 +106,13 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		SessionCache:      sessionCache,
 	}
 
-	userService, err := services.NewUserService(userServiceDependencies, log)
+	userService, err := services.NewUserService(userServiceDependencies, log, tracer)
 	if err != nil {
 		return nil, err
 	}
 
 	var (
-		authHandler = http_handlers.NewAuthHandler(userService, log)
+		authHandler = http_handlers.NewAuthHandler(userService, log, tracer)
 	)
 
 	if cfg.Mode == "debug" {
@@ -137,7 +141,7 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	//go http.ListenAndServe(":9091", promhttp.Handler())
 
 	var (
-		server = InitHTTPServer(cfg, router)
+		server = InitHTTPServer(ctx, cfg, router)
 	)
 
 	return &App{
@@ -189,45 +193,99 @@ func InitRedisCache(ctx context.Context, cfg *config.Config) (*redis_cache.Redis
 	return redis_cache.NewRedis(ctx, redisConfig)
 }
 
-func InitHTTPServer(cfg *config.Config, handler http.Handler) *http_server.HTTPServer {
+func InitHTTPServer(ctx context.Context, cfg *config.Config, handler http.Handler) *http_server.HTTPServer {
 	httpServerConfig := http_server.Config{
 		Address:         cfg.Server.HTTP.Address,
 		ShutdownTimeout: cfg.Server.HTTP.ShutdownTimeout,
 		TLSConfig:       nil,
 	}
 
-	return http_server.New(httpServerConfig, handler)
+	return http_server.New(ctx, httpServerConfig, handler)
 }
 
-func InitTracer(ctx context.Context, name string) (func(ctx context.Context) error, error) {
-	exporter, err := otlptracehttp.New(
-		ctx,
-		otlptracehttp.WithInsecure(),
-		otlptracehttp.WithEndpoint("http://jaeger:14268/api/traces"), // Убедитесь, что endpoint правильный
-	)
+// func InitTracer(ctx context.Context, name string) (func(ctx context.Context) error, error) {
+// 	exporter, err := otlptracehttp.New(
+// 		ctx,
+// 		otlptracehttp.WithInsecure(),
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	resources, err := resource.Merge(
+// 		resource.Default(),
+// 		resource.NewWithAttributes(
+// 			semconv.SchemaURL,
+// 			semconv.ServiceNameKey.String(serviceName),
+// 		),
+// 	)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	provider := trace.NewTracerProvider(
+// 		trace.WithBatcher(exporter),
+// 		trace.WithResource(resources),
+// 	)
+
+// 	otel.SetTracerProvider(provider)
+
+// 	otel.SetTextMapPropagator(propagation.TraceContext{})
+
+// 	if err := exporter.Start(ctx); err != nil {
+// 		return nil, errors.Wrap(err, "exporter error")
+// 	}
+
+// 	return provider.Shutdown, nil
+// }
+
+// setupOTelSDK bootstraps the OpenTelemetry pipeline.
+// If it does not return an error, make sure to call shutdown for proper cleanup.
+func InitTracer(ctx context.Context) (shutdown func(context.Context) error, err error) {
+	exp, err := newExporter(ctx)
 	if err != nil {
-		return nil, err
+		log.Fatalf("failed to initialize exporter: %v", err)
 	}
 
-	resources, err := resource.Merge(
+	// Create a new tracer provider with a batch span processor and the given exporter.
+	tp := newTraceProvider(exp)
+
+	otel.SetTracerProvider(tp)
+
+	// Finally, set the tracer that can be used for this package.
+	tracer = tp.Tracer("example.io/package/name")
+
+	go func() {
+		for {
+			time.Sleep(time.Second)
+			tp.ForceFlush(ctx)
+		}
+	}()
+
+	return tp.Shutdown, nil
+}
+
+func newExporter(ctx context.Context) (*stdouttrace.Exporter, error) {
+	// Your preferred exporter: console, jaeger, zipkin, OTLP, etc.
+	return stdouttrace.New(stdouttrace.WithPrettyPrint())
+}
+
+func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
+	// Ensure default SDK resources and the required service name are set.
+	r, err := resource.Merge(
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceName("ExampleService"),
 		),
 	)
+
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
-	provider := trace.NewTracerProvider(
-		trace.WithBatcher(exporter),
-		trace.WithResource(resources),
+	return sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp),
+		sdktrace.WithResource(r),
 	)
-
-	otel.SetTracerProvider(provider)
-
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	return provider.Shutdown, nil
 }

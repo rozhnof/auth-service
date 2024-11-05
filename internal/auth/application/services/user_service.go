@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type AccessTokenManager interface {
@@ -74,10 +75,11 @@ func (d Dependencies) Valid() error {
 
 type UserService struct {
 	Dependencies
-	log *slog.Logger
+	log    *slog.Logger
+	tracer trace.Tracer
 }
 
-func NewUserService(d Dependencies, log *slog.Logger) (*UserService, error) {
+func NewUserService(d Dependencies, log *slog.Logger, tracer trace.Tracer) (*UserService, error) {
 	if err := d.Valid(); err != nil {
 		return nil, errors.Wrap(err, "missing required dependency")
 	}
@@ -90,6 +92,7 @@ func NewUserService(d Dependencies, log *slog.Logger) (*UserService, error) {
 	return &UserService{
 		Dependencies: d,
 		log:          log,
+		tracer:       tracer,
 	}, nil
 }
 
@@ -126,6 +129,9 @@ func (s *UserService) Register(ctx context.Context, username string, password st
 }
 
 func (s *UserService) Login(ctx context.Context, username string, password string) (at string, rt string, err error) {
+	ctx, span := s.tracer.Start(ctx, "AuthHandler.Login")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserService.Login"),
 		slog.String("username", username),
