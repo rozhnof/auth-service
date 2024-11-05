@@ -20,6 +20,10 @@ type Redis struct {
 	client *redis.Client
 }
 
+func (r *Redis) Client() *redis.Client {
+	return r.client
+}
+
 func NewRedis(ctx context.Context, cfg RedisConfig) (*Redis, error) {
 	options := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Address, cfg.Port),

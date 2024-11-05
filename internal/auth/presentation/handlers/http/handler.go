@@ -21,3 +21,5 @@ func NewAuthHandler(service *services.UserService, log *slog.Logger) *AuthHandle
 		log:         log,
 	}
 }
+
+const tracerName = "Auth Service"

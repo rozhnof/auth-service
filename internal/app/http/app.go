@@ -5,6 +5,7 @@ import (
 	redis_cache "auth/internal/auth/infrastructure/cache/redis"
 	postgres_session_repository "auth/internal/auth/infrastructure/repository/postgres/session"
 	postgres_user_repository "auth/internal/auth/infrastructure/repository/postgres/user"
+	"auth/internal/auth/infrastructure/tracer"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
 	"auth/internal/pkg/config"
 	postgres_database "auth/internal/pkg/database/postgres"
@@ -18,6 +19,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -37,6 +40,11 @@ var (
 	)
 )
 
+const (
+	jaegerURL   = "localhost:4318"
+	serviceName = "Auth Service"
+)
+
 type App struct {
 	server *http_server.HTTPServer
 	log    *slog.Logger
@@ -53,6 +61,12 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	if err != nil {
 		return nil, err
 	}
+
+	shutdown, err := InitTracer(ctx, jaegerURL, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	defer shutdown(ctx)
 
 	var (
 		userCache    = redis_cache.NewUserCache(redisCache)
@@ -107,6 +121,7 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	)
 
 	middlewareList := []gin.HandlerFunc{
+		otelgin.Middleware(serviceName),
 		PrometheusMiddleware(),
 		LogMiddleware(log),
 	}
@@ -179,4 +194,20 @@ func InitHTTPServer(cfg *config.Config, handler http.Handler) *http_server.HTTPS
 	}
 
 	return http_server.New(httpServerConfig, handler)
+}
+
+func InitTracer(ctx context.Context, jaegerURL string, name string) (func(ctx context.Context) error, error) {
+	exporter, err := tracer.NewJaegerExporter(ctx, jaegerURL)
+	if err != nil {
+		return nil, fmt.Errorf("initialize exporter: %w", err)
+	}
+
+	provider, err := tracer.NewTraceProvider(exporter, name)
+	if err != nil {
+		return nil, fmt.Errorf("initialize provider: %w", err)
+	}
+
+	otel.SetTracerProvider(provider)
+
+	return provider.Shutdown, nil
 }

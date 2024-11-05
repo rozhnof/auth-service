@@ -141,14 +141,6 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    deploy:
-      resources:
-        limits:
-          cpus: '0.50'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
     command: >
       sh -c '
         mkdir -p /usr/local/etc/redis &&
@@ -168,6 +160,14 @@ services:
     restart: unless-stopped
     tty: true
     stdin_open: true
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.26
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=9411
+    ports:
+      - "14268:14268"
+      - "16686:16686"
 
 volumes:
   postgres_data:
