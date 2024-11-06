@@ -1,8 +1,8 @@
+//go:generate ffjson $GOFILE
 package http_handlers
 
 import (
 	"auth/internal/auth/application/services"
-	"log/slog"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -34,26 +34,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Login")
 	defer span.End()
 
-	log := h.log.With(
-		slog.String("function", "AuthHandler.Login"),
-	)
-
 	var request LoginRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.Info("bad request")
-
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	log = log.With(
-		slog.String("username", request.Username),
-	)
-
 	at, rt, err := h.userService.Login(ctx, request.Username, request.Password)
 	if err != nil {
-		log.Info("failed user login", slog.String("error", err.Error()))
-
 		if errors.Is(err, services.ErrInvalidPassword) {
 			c.String(http.StatusOK, "invalid username or password")
 			return
@@ -68,5 +56,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		RefreshToken: rt,
 	}
 
-	c.JSON(http.StatusOK, response)
+	bytes, _ := response.MarshalJSON()
+
+	c.Data(http.StatusOK, "application/json", bytes)
 }

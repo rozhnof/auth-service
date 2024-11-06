@@ -1,6 +1,6 @@
 package postgres_user_queries
 
-const UpdateQuery = `
+const Update = `
 	UPDATE 
 		users 
 	SET  

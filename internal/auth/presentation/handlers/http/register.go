@@ -1,7 +1,7 @@
+//go:generate ffjson $GOFILE
 package http_handlers
 
 import (
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -30,26 +30,14 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Register")
 	defer span.End()
 
-	log := h.log.With(
-		slog.String("function", "AuthHandler.Register"),
-	)
-
 	var request RegisterRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.Info("bad request")
-
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	log = log.With(
-		slog.String("username", request.Username),
-	)
-
 	registeredUser, err := h.userService.Register(ctx, request.Username, request.Password)
 	if err != nil {
-		log.Info("register failed", slog.String("error", err.Error()))
-
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -58,5 +46,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		User: UserToDTO(*registeredUser),
 	}
 
-	c.JSON(http.StatusOK, response)
+	bytes, _ := response.MarshalJSON()
+
+	c.Data(http.StatusOK, "application/json", bytes)
 }

@@ -2,43 +2,38 @@ package postgres_user_repository
 
 import (
 	"auth/internal/auth/domain/models"
-	"auth/internal/auth/infrastructure/repository"
 	queries "auth/internal/auth/infrastructure/repository/postgres/user/queries"
+	pgxdb "auth/internal/pkg/database/postgres"
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/georgysavva/scany/pgxscan"
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/trace"
 )
 
-type PostgresDatabase interface {
-	Query(ctx context.Context, query string, args ...any) (pgx.Rows, error)
-}
-
 type UserRepository struct {
-	db  PostgresDatabase
-	log *slog.Logger
+	db        *pgxpool.Pool
+	txManager *pgxdb.TransactionManager
+	log       *slog.Logger
+	tracer    trace.Tracer
 }
 
-func NewUserRepository(db PostgresDatabase, log *slog.Logger) *UserRepository {
-	log = log.With(
-		slog.String("layer", "infrastructure"),
-		slog.String("pkg", "postgres_user_repository"),
-	)
-
+func NewUserRepository(db *pgxpool.Pool, txManager *pgxdb.TransactionManager, log *slog.Logger, tracer trace.Tracer) *UserRepository {
 	return &UserRepository{
-		db:  db,
-		log: log,
+		db:        db,
+		txManager: txManager,
+		log:       log,
+		tracer:    tracer,
 	}
 }
 
 func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.Create")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserRepository.Create"),
 		slog.String("username", user.Username),
@@ -46,7 +41,9 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 
 	log.Debug("create user start", slog.String("password", user.HashPassword))
 
-	rows, err := s.db.Query(ctx, queries.Create, user.Username, user.HashPassword)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Create, user.Username, user.HashPassword)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -54,16 +51,8 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 	}
 	defer rows.Close()
 
-	var createdUser models.User
-	if err := pgxscan.ScanOne(&createdUser, rows); err != nil {
-		var pgErr *pgconn.PgError
-
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			return nil, errors.Wrapf(repository.ErrDuplicate, "user with username = %s already exists", user.Username)
-		}
-
+	createdUser, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[models.User])
+	if err != nil {
 		return nil, err
 	}
 
@@ -73,6 +62,9 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 }
 
 func (s *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*models.User, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.GetByID")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserRepository.GetByID"),
 		slog.String("user_id", userID.String()),
@@ -80,56 +72,9 @@ func (s *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*models
 
 	log.Debug("get user by id start")
 
-	var userEntity models.User
+	db := s.txManager.TxOrDB(ctx)
 
-	if err := pgxscan.Get(ctx, s.db, &userEntity, queries.GetByID, userID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.Wrap(repository.ErrNotExists, fmt.Sprintf("user with id = %s does not exists", userID))
-		}
-
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
-		return nil, err
-	}
-
-	log.Debug("get user by id end")
-
-	return &userEntity, nil
-}
-
-func (s *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
-	log := s.log.With(
-		slog.String("function", "UserRepository.GetByUsername"),
-		slog.String("username", username),
-	)
-
-	log.Debug("get user by username start")
-
-	var userEntity models.User
-
-	if err := pgxscan.Get(ctx, s.db, &userEntity, queries.GetByUsername, username); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.Wrap(repository.ErrNotExists, fmt.Sprintf("user with username = %s does not exists", username))
-		}
-
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
-		return nil, err
-	}
-
-	log.Debug("get user by username end")
-
-	return &userEntity, nil
-}
-
-func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
-	log := s.log.With(
-		slog.String("function", "UserRepository.List"),
-	)
-
-	log.Debug("list user start")
-
-	rows, err := s.db.Query(ctx, queries.List)
+	rows, err := db.Query(ctx, queries.GetByID, userID)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -137,10 +82,69 @@ func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
 	}
 	defer rows.Close()
 
-	var userList []models.User
-	if err := pgxscan.ScanAll(&userList, rows); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
+	user, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[models.User])
+	if err != nil {
+		return nil, err
+	}
 
+	log.Debug("get user by id end")
+
+	return &user, nil
+}
+
+func (s *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.GetByUsername")
+	defer span.End()
+
+	log := s.log.With(
+		slog.String("function", "UserRepository.GetByUsername"),
+		slog.String("username", username),
+	)
+
+	log.Debug("get user by username start")
+
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.GetByUsername, username)
+	if err != nil {
+		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
+
+		return nil, err
+	}
+	defer rows.Close()
+
+	user, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[models.User])
+	if err != nil {
+		return nil, err
+	}
+
+	log.Debug("get user by username end")
+
+	return &user, nil
+}
+
+func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.List")
+	defer span.End()
+
+	log := s.log.With(
+		slog.String("function", "UserRepository.List"),
+	)
+
+	log.Debug("list user start")
+
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.List)
+	if err != nil {
+		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
+
+		return nil, err
+	}
+	defer rows.Close()
+
+	userList, err := pgx.CollectRows(rows, pgx.RowTo[models.User])
+	if err != nil {
 		return nil, err
 	}
 
@@ -150,6 +154,9 @@ func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
 }
 
 func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.Update")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserRepository.Update"),
 		slog.String("username", user.Username),
@@ -157,7 +164,9 @@ func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models
 
 	log.Debug("update user start")
 
-	rows, err := s.db.Query(ctx, queries.Create, user.Username, user.HashPassword)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Update, user.Username, user.HashPassword)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -165,10 +174,8 @@ func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models
 	}
 	defer rows.Close()
 
-	var updatedUser models.User
-	if err := pgxscan.ScanOne(&updatedUser, rows); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
+	updatedUser, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[models.User])
+	if err != nil {
 		return nil, err
 	}
 
@@ -178,6 +185,9 @@ func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models
 }
 
 func (s *UserRepository) Delete(ctx context.Context, userID uuid.UUID) (*time.Time, error) {
+	ctx, span := s.tracer.Start(ctx, "UserRepository.Delete")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserRepository.Create"),
 		slog.String("user_id", userID.String()),
@@ -185,7 +195,9 @@ func (s *UserRepository) Delete(ctx context.Context, userID uuid.UUID) (*time.Ti
 
 	log.Debug("delete user start")
 
-	rows, err := s.db.Query(ctx, queries.Delete, userID)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Delete, userID)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -193,14 +205,8 @@ func (s *UserRepository) Delete(ctx context.Context, userID uuid.UUID) (*time.Ti
 	}
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, repository.ErrNotExists
-	}
-
-	var deletedAt time.Time
-	if err := rows.Scan(&deletedAt); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
+	deletedAt, err := pgx.RowTo[time.Time](rows)
+	if err != nil {
 		return nil, err
 	}
 

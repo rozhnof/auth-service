@@ -2,17 +2,15 @@ package postgres_session_repository
 
 import (
 	"auth/internal/auth/domain/models"
-	"auth/internal/auth/infrastructure/repository"
 	queries "auth/internal/auth/infrastructure/repository/postgres/session/queries"
+	pgxdb "auth/internal/pkg/database/postgres"
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/georgysavva/scany/pgxscan"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
+	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type PostgresDatabase interface {
@@ -20,23 +18,25 @@ type PostgresDatabase interface {
 }
 
 type SessionRepository struct {
-	db  PostgresDatabase
-	log *slog.Logger
+	db        PostgresDatabase
+	txManager *pgxdb.TransactionManager
+	log       *slog.Logger
+	tracer    trace.Tracer
 }
 
-func NewSessionRepository(db PostgresDatabase, log *slog.Logger) *SessionRepository {
-	log = log.With(
-		slog.String("layer", "infrastructure"),
-		slog.String("pkg", "postgres_session_repository"),
-	)
-
+func NewSessionRepository(db PostgresDatabase, txManager *pgxdb.TransactionManager, log *slog.Logger, tracer trace.Tracer) *SessionRepository {
 	return &SessionRepository{
-		db:  db,
-		log: log,
+		db:        db,
+		txManager: txManager,
+		log:       log,
+		tracer:    tracer,
 	}
 }
 
 func (s *SessionRepository) Create(ctx context.Context, session *models.Session) (*models.Session, error) {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.Create")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "SessionRepository.Create"),
 		slog.String("user_id", session.UserID.String()),
@@ -53,7 +53,9 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 		sessionEntity.IsRevoked,
 	}
 
-	rows, err := s.db.Query(ctx, queries.Create, args...)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Create, args...)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -61,10 +63,8 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 	}
 	defer rows.Close()
 
-	var createdSessionEntity Session
-	if err := pgxscan.ScanOne(&createdSessionEntity, rows); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
+	createdSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	if err != nil {
 		return nil, err
 	}
 
@@ -74,30 +74,39 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 }
 
 func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken string) (*models.Session, error) {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.GetByRefreshToken")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "SessionRepository.GetByRefreshToken"),
 	)
 
 	log.Debug("get session by refresh token start")
 
-	var session Session
+	db := s.txManager.TxOrDB(ctx)
 
-	if err := pgxscan.Get(ctx, s.db, &session, queries.GetByRefreshToken, refreshToken); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.Wrap(repository.ErrNotExists, fmt.Sprintf("session with refresh token = %s does not exists", refreshToken))
-		}
-
+	rows, err := db.Query(ctx, queries.GetByRefreshToken, refreshToken)
+	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
+		return nil, err
+	}
+	defer rows.Close()
+
+	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	if err != nil {
 		return nil, err
 	}
 
 	log.Debug("get session by refresh token end")
 
-	return SessionToModel(&session), nil
+	return SessionToModel(&sessionEntity), nil
 }
 
 func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*models.Session, error) {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.GetByID")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "SessionRepository.GetByID"),
 		slog.String("session_id", sessionID.String()),
@@ -105,24 +114,30 @@ func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*
 
 	log.Debug("get session by id end")
 
-	var session Session
+	db := s.txManager.TxOrDB(ctx)
 
-	if err := pgxscan.Get(ctx, s.db, &session, queries.GetByID, sessionID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.Wrap(repository.ErrNotExists, fmt.Sprintf("session with id = %s does not exists", sessionID))
-		}
-
+	rows, err := db.Query(ctx, queries.GetByID, sessionID)
+	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
+		return nil, err
+	}
+	defer rows.Close()
+
+	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	if err != nil {
 		return nil, err
 	}
 
 	log.Debug("get session by id end")
 
-	return SessionToModel(&session), nil
+	return SessionToModel(&sessionEntity), nil
 }
 
 func (s *SessionRepository) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.Update")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "SessionRepository.Update"),
 		slog.String("session_id", session.ID.String()),
@@ -140,7 +155,9 @@ func (s *SessionRepository) Update(ctx context.Context, session *models.Session)
 		sessionEntity.IsRevoked,
 	}
 
-	rows, err := s.db.Query(ctx, queries.Update, args...)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Update, args...)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -148,19 +165,20 @@ func (s *SessionRepository) Update(ctx context.Context, session *models.Session)
 	}
 	defer rows.Close()
 
-	var updatedSession Session
-	if err := pgxscan.ScanOne(&updatedSession, rows); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
+	updatedSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	if err != nil {
 		return nil, err
 	}
 
 	log.Debug("update session end")
 
-	return SessionToModel(&updatedSession), nil
+	return SessionToModel(&updatedSessionEntity), nil
 }
 
 func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*time.Time, error) {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.Delete")
+	defer span.End()
+
 	log := s.log.With(
 		slog.String("function", "UserRepository.Create"),
 		slog.String("session_id", sessionID.String()),
@@ -168,7 +186,9 @@ func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*t
 
 	log.Debug("delete session start")
 
-	rows, err := s.db.Query(ctx, queries.Delete, sessionID)
+	db := s.txManager.TxOrDB(ctx)
+
+	rows, err := db.Query(ctx, queries.Delete, sessionID)
 	if err != nil {
 		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
 
@@ -176,14 +196,8 @@ func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*t
 	}
 	defer rows.Close()
 
-	if !rows.Next() {
-		return nil, repository.ErrNotExists
-	}
-
-	var deletedAt time.Time
-	if err := rows.Scan(&deletedAt); err != nil {
-		log.Info("scan rows error", slog.Any("error", err.Error()))
-
+	deletedAt, err := pgx.RowTo[time.Time](rows)
+	if err != nil {
 		return nil, err
 	}
 

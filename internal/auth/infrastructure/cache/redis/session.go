@@ -2,6 +2,7 @@ package redis_cache
 
 import (
 	"auth/internal/auth/domain/models"
+	redisdb "auth/internal/pkg/database/redis"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,10 +10,10 @@ import (
 )
 
 type SessionCache struct {
-	Redis
+	redisdb.Redis
 }
 
-func NewSessionCache(redis *Redis) *SessionCache {
+func NewSessionCache(redis *redisdb.Redis) *SessionCache {
 	return &SessionCache{
 		Redis: *redis,
 	}
@@ -21,7 +22,7 @@ func NewSessionCache(redis *Redis) *SessionCache {
 func (r *SessionCache) Get(ctx context.Context, id string) (models.Session, error) {
 	key := createSessionKey(id)
 
-	bytes, err := r.client.Get(ctx, key).Bytes()
+	bytes, err := r.Client.Get(ctx, key).Bytes()
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -42,13 +43,13 @@ func (r *SessionCache) Set(ctx context.Context, id string, session models.Sessio
 		return err
 	}
 
-	return r.client.Set(ctx, key, bytes, ttl).Err()
+	return r.Client.Set(ctx, key, bytes, ttl).Err()
 }
 
 func (r *SessionCache) Delete(ctx context.Context, id string) error {
 	key := createSessionKey(id)
 
-	return r.client.Del(ctx, key).Err()
+	return r.Client.Del(ctx, key).Err()
 }
 
 func createSessionKey(id string) string {

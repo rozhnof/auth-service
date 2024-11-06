@@ -1,9 +1,10 @@
-package redis_cache
+package redisdb
 
 import (
 	"context"
 	"fmt"
 
+	"github.com/redis/go-redis/extra/redisotel/v9"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -17,11 +18,7 @@ type RedisConfig struct {
 }
 
 type Redis struct {
-	client *redis.Client
-}
-
-func (r *Redis) Close(ctx context.Context) error {
-	return r.client.Close()
+	*redis.Client
 }
 
 func NewRedis(ctx context.Context, cfg RedisConfig) (*Redis, error) {
@@ -38,7 +35,11 @@ func NewRedis(ctx context.Context, cfg RedisConfig) (*Redis, error) {
 		return nil, err
 	}
 
+	if err := redisotel.InstrumentTracing(client); err != nil {
+		return nil, err
+	}
+
 	return &Redis{
-		client: client,
+		Client: client,
 	}, nil
 }

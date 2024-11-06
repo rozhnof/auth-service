@@ -2,6 +2,7 @@ package redis_cache
 
 import (
 	"auth/internal/auth/domain/models"
+	redisdb "auth/internal/pkg/database/redis"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,10 +10,10 @@ import (
 )
 
 type UserCache struct {
-	Redis
+	redisdb.Redis
 }
 
-func NewUserCache(redis *Redis) *UserCache {
+func NewUserCache(redis *redisdb.Redis) *UserCache {
 	return &UserCache{
 		Redis: *redis,
 	}
@@ -21,7 +22,7 @@ func NewUserCache(redis *Redis) *UserCache {
 func (r *UserCache) Get(ctx context.Context, username string) (models.User, error) {
 	key := createUserKey(username)
 
-	bytes, err := r.client.Get(ctx, key).Bytes()
+	bytes, err := r.Client.Get(ctx, key).Bytes()
 	if err != nil {
 		return models.User{}, err
 	}
@@ -42,13 +43,13 @@ func (r *UserCache) Set(ctx context.Context, username string, user models.User, 
 		return err
 	}
 
-	return r.client.Set(ctx, key, bytes, ttl).Err()
+	return r.Client.Set(ctx, key, bytes, ttl).Err()
 }
 
 func (r *UserCache) Delete(ctx context.Context, username string) error {
 	key := createUserKey(username)
 
-	return r.client.Del(ctx, key).Err()
+	return r.Client.Del(ctx, key).Err()
 }
 
 func createUserKey(username string) string {

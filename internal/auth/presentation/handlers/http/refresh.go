@@ -1,8 +1,8 @@
+//go:generate ffjson $GOFILE
 package http_handlers
 
 import (
 	"auth/internal/auth/application/services"
-	"log/slog"
 	"net/http"
 
 	"github.com/pkg/errors"
@@ -34,22 +34,14 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Refresh")
 	defer span.End()
 
-	log := h.log.With(
-		slog.String("function", "AuthHandler.Refresh"),
-	)
-
 	var request RefreshRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		log.Info("bad request")
-
 		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
 	at, rt, err := h.userService.Refresh(ctx, request.RefreshToken)
 	if err != nil {
-		log.Info("refresh failed", slog.String("error", err.Error()))
-
 		if errors.Is(err, services.ErrUnauthorizedRefresh) {
 			c.String(http.StatusUnauthorized, "invalid refresh token")
 			return
@@ -64,5 +56,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 		RefreshToken: rt,
 	}
 
-	c.JSON(http.StatusOK, response)
+	bytes, _ := response.MarshalJSON()
+
+	c.Data(http.StatusOK, "application/json", bytes)
 }

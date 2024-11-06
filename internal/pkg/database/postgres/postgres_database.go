@@ -1,11 +1,11 @@
-package postgres_database
+package pgxdb
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/exaring/otelpgx"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Config struct {
@@ -17,28 +17,20 @@ type Config struct {
 	SSL      string
 }
 
-type Database struct {
-	cluster *pgxpool.Pool
-}
-
-func (db Database) BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error) {
-	return db.cluster.BeginTx(ctx, txOptions)
-}
-
-func (db Database) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
-	return db.cluster.Query(ctx, sql, args...)
-}
-
-func (db Database) Close() {
-	db.cluster.Close()
-}
-
-func NewDatabase(ctx context.Context, cfg Config) (*Database, error) {
-	cluster, err := pgxpool.Connect(ctx, CreateConnectionString(cfg))
+func NewDatabase(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
+	pgxCfg, err := pgxpool.ParseConfig(CreateConnectionString(cfg))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("create connection pool: %w", err)
 	}
-	return &Database{cluster: cluster}, nil
+
+	pgxCfg.ConnConfig.Tracer = otelpgx.NewTracer()
+
+	pool, err := pgxpool.NewWithConfig(ctx, pgxCfg)
+	if err != nil {
+		return nil, fmt.Errorf("connect to database: %w", err)
+	}
+
+	return pool, nil
 }
 
 func CreateConnectionString(cfg Config) string {

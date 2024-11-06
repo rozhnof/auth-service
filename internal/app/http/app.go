@@ -8,7 +8,8 @@ import (
 	tracing "auth/internal/auth/infrastructure/tracer"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
 	"auth/internal/pkg/config"
-	postgres_database "auth/internal/pkg/database/postgres"
+	pgxdb "auth/internal/pkg/database/postgres"
+	redisdb "auth/internal/pkg/database/redis"
 	"auth/internal/pkg/password_manager"
 	http_server "auth/internal/pkg/server/http"
 	"auth/internal/pkg/token_manager"
@@ -19,6 +20,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
@@ -49,35 +51,27 @@ const (
 )
 
 type App struct {
-	server  *http_server.HTTPServer
-	log     *slog.Logger
-	router  *gin.Engine
-	closers []func(context.Context) error
+	server    *http_server.HTTPServer
+	log       *slog.Logger
+	router    *gin.Engine
+	closeFunc func(ctx context.Context) error
 }
 
 func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, error) {
-	closers := []func(context.Context) error{}
-
 	postgresDatabase, err := InitPostgresDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	closers = append(closers, func(_ context.Context) error {
-		postgresDatabase.Close()
-		return nil
-	})
 
 	redisCache, err := InitRedisCache(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
-	closers = append(closers, redisCache.Close)
 
 	tracer, shutdown, err := InitTracer(ctx, traceExporterEndpoint, tracerName, serviceName)
 	if err != nil {
 		return nil, err
 	}
-	closers = append(closers, shutdown)
 
 	var (
 		userCache    = redis_cache.NewUserCache(redisCache)
@@ -85,24 +79,21 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	)
 
 	var (
-		transactionManager = postgres_database.NewTransactionManager(postgresDatabase)
-	)
-
-	var (
-		userRepository    = postgres_user_repository.NewUserRepository(transactionManager, log)
-		sessionRepository = postgres_session_repository.NewSessionRepository(transactionManager, log)
-	)
-
-	var (
+		txManager       = pgxdb.NewTransactionManager(postgresDatabase)
 		atManager       = token_manager.NewAccessTokenManager(cfg.Service.Tokens.Access.Timeout, []byte(cfg.Service.Tokens.Access.SecretKey))
 		rtManager       = token_manager.NewRefreshTokenManager(cfg.Service.Tokens.Refresh.Timeout)
 		passwordManager = password_manager.NewPasswordManager()
 	)
 
+	var (
+		userRepository    = postgres_user_repository.NewUserRepository(postgresDatabase, txManager, log, tracer)
+		sessionRepository = postgres_session_repository.NewSessionRepository(postgresDatabase, txManager, log, tracer)
+	)
+
 	userServiceDependencies := services.Dependencies{
 		UserRepository:    userRepository,
 		SessionRepository: sessionRepository,
-		TxManager:         transactionManager,
+		TxManager:         txManager,
 		AtManager:         atManager,
 		RtManager:         rtManager,
 		PasswordManager:   passwordManager,
@@ -148,24 +139,32 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		server = InitHTTPServer(ctx, cfg, router)
 	)
 
+	closeFunc := func(ctx context.Context) error {
+		var errs error
+
+		postgresDatabase.Close()
+
+		if err := redisCache.Close(); err != nil {
+			errs = errors.Join(errs, err)
+		}
+
+		if err := shutdown(ctx); err != nil {
+			errs = errors.Join(errs, err)
+		}
+
+		return errs
+	}
+
 	return &App{
-		server:  server,
-		log:     log,
-		router:  router,
-		closers: closers,
+		server:    server,
+		log:       log,
+		router:    router,
+		closeFunc: closeFunc,
 	}, nil
 }
 
 func (a *App) Close(ctx context.Context) error {
-	var errs error
-
-	for _, closer := range a.closers {
-		if err := closer(ctx); err != nil {
-			errs = errors.Join(errs, err)
-		}
-	}
-
-	return errs
+	return a.closeFunc(ctx)
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -184,8 +183,8 @@ func (a *App) Stop(ctx context.Context) error {
 	return a.server.Shutdown(ctx)
 }
 
-func InitPostgresDatabase(ctx context.Context, cfg *config.Config) (*postgres_database.Database, error) {
-	databaseConfig := postgres_database.Config{
+func InitPostgresDatabase(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+	databaseConfig := pgxdb.Config{
 		Address:  cfg.Repository.Address,
 		Port:     cfg.Repository.Port,
 		User:     cfg.Repository.User,
@@ -194,11 +193,11 @@ func InitPostgresDatabase(ctx context.Context, cfg *config.Config) (*postgres_da
 		SSL:      cfg.Repository.SSL,
 	}
 
-	return postgres_database.NewDatabase(ctx, databaseConfig)
+	return pgxdb.NewDatabase(ctx, databaseConfig)
 }
 
-func InitRedisCache(ctx context.Context, cfg *config.Config) (*redis_cache.Redis, error) {
-	redisConfig := redis_cache.RedisConfig{
+func InitRedisCache(ctx context.Context, cfg *config.Config) (*redisdb.Redis, error) {
+	redisConfig := redisdb.RedisConfig{
 		Address:      cfg.Cache.Redis.Address,
 		Port:         cfg.Cache.Redis.Port,
 		User:         cfg.Cache.Redis.User,
@@ -207,7 +206,7 @@ func InitRedisCache(ctx context.Context, cfg *config.Config) (*redis_cache.Redis
 		DB:           cfg.Cache.Redis.DB,
 	}
 
-	return redis_cache.NewRedis(ctx, redisConfig)
+	return redisdb.NewRedis(ctx, redisConfig)
 }
 
 func InitHTTPServer(ctx context.Context, cfg *config.Config, handler http.Handler) *http_server.HTTPServer {

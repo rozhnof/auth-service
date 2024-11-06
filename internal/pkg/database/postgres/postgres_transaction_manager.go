@@ -1,27 +1,37 @@
-package postgres_database
+package pgxdb
 
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/pkg/errors"
+	"errors"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type txKeyType string
 
 var txKeyValue = txKeyType("tx")
 
-type QueryEngine interface {
+type Transaction interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+
+	CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
 type TransactionManager struct {
-	*Database
+	db *pgxpool.Pool
 }
 
-func NewTransactionManager(db *Database) *TransactionManager {
+func NewTransactionManager(db *pgxpool.Pool) *TransactionManager {
 	txManager := &TransactionManager{
-		Database: db,
+		db: db,
 	}
 
 	return txManager
@@ -33,7 +43,7 @@ func (m *TransactionManager) WithTransaction(ctx context.Context, f func(ctx con
 		AccessMode: pgx.ReadWrite,
 	}
 
-	tx, err := m.BeginTx(ctx, txOptions)
+	tx, err := m.db.BeginTx(ctx, txOptions)
 	if err != nil {
 		return err
 	}
@@ -41,8 +51,7 @@ func (m *TransactionManager) WithTransaction(ctx context.Context, f func(ctx con
 	ctxWithTx := context.WithValue(ctx, txKeyValue, tx)
 	if err := f(ctxWithTx); err != nil {
 		if errRollback := tx.Rollback(ctx); errRollback != nil {
-			// TODO
-			return errors.Errorf("%w and %w", err, errRollback)
+			return errors.Join(err, errRollback)
 		}
 		return err
 	}
@@ -54,11 +63,11 @@ func (m *TransactionManager) WithTransaction(ctx context.Context, f func(ctx con
 	return nil
 }
 
-func (m *TransactionManager) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
-	queryEngine, ok := ctx.Value(txKeyValue).(QueryEngine)
+func (m *TransactionManager) TxOrDB(ctx context.Context) Transaction {
+	tx, ok := ctx.Value(txKeyValue).(Transaction)
 	if !ok {
-		return m.Database.Query(ctx, sql, args...)
+		return m.db
 	}
 
-	return queryEngine.Query(ctx, sql, args...)
+	return tx
 }
