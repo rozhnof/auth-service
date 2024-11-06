@@ -5,6 +5,7 @@ import (
 	redis_cache "auth/internal/auth/infrastructure/cache/redis"
 	postgres_session_repository "auth/internal/auth/infrastructure/repository/postgres/session"
 	postgres_user_repository "auth/internal/auth/infrastructure/repository/postgres/user"
+	tracing "auth/internal/auth/infrastructure/tracer"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
 	"auth/internal/pkg/config"
 	postgres_database "auth/internal/pkg/database/postgres"
@@ -12,20 +13,15 @@ import (
 	http_server "auth/internal/pkg/server/http"
 	"auth/internal/pkg/token_manager"
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -46,34 +42,42 @@ var (
 	)
 )
 
-var tracer trace.Tracer
-
 const (
-	serviceName = "auth-service"
+	serviceName           = "Auth Service"
+	tracerName            = "auth-service-tracer"
+	traceExporterEndpoint = "localhost:4318"
 )
 
 type App struct {
-	server *http_server.HTTPServer
-	log    *slog.Logger
-	router *gin.Engine
+	server  *http_server.HTTPServer
+	log     *slog.Logger
+	router  *gin.Engine
+	closers []func(context.Context) error
 }
 
 func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, error) {
+	closers := []func(context.Context) error{}
+
 	postgresDatabase, err := InitPostgresDatabase(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	closers = append(closers, func(_ context.Context) error {
+		postgresDatabase.Close()
+		return nil
+	})
 
 	redisCache, err := InitRedisCache(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
+	closers = append(closers, redisCache.Close)
 
-	shutdown, err := InitTracer(ctx)
+	tracer, shutdown, err := InitTracer(ctx, traceExporterEndpoint, tracerName, serviceName)
 	if err != nil {
 		return nil, err
 	}
-	defer shutdown(ctx)
+	closers = append(closers, shutdown)
 
 	var (
 		userCache    = redis_cache.NewUserCache(redisCache)
@@ -145,10 +149,23 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	)
 
 	return &App{
-		server: server,
-		log:    log,
-		router: router,
+		server:  server,
+		log:     log,
+		router:  router,
+		closers: closers,
 	}, nil
+}
+
+func (a *App) Close(ctx context.Context) error {
+	var errs error
+
+	for _, closer := range a.closers {
+		if err := closer(ctx); err != nil {
+			errs = errors.Join(errs, err)
+		}
+	}
+
+	return errs
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -203,89 +220,20 @@ func InitHTTPServer(ctx context.Context, cfg *config.Config, handler http.Handle
 	return http_server.New(ctx, httpServerConfig, handler)
 }
 
-// func InitTracer(ctx context.Context, name string) (func(ctx context.Context) error, error) {
-// 	exporter, err := otlptracehttp.New(
-// 		ctx,
-// 		otlptracehttp.WithInsecure(),
-// 	)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	resources, err := resource.Merge(
-// 		resource.Default(),
-// 		resource.NewWithAttributes(
-// 			semconv.SchemaURL,
-// 			semconv.ServiceNameKey.String(serviceName),
-// 		),
-// 	)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	provider := trace.NewTracerProvider(
-// 		trace.WithBatcher(exporter),
-// 		trace.WithResource(resources),
-// 	)
-
-// 	otel.SetTracerProvider(provider)
-
-// 	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-// 	if err := exporter.Start(ctx); err != nil {
-// 		return nil, errors.Wrap(err, "exporter error")
-// 	}
-
-// 	return provider.Shutdown, nil
-// }
-
-// setupOTelSDK bootstraps the OpenTelemetry pipeline.
-// If it does not return an error, make sure to call shutdown for proper cleanup.
-func InitTracer(ctx context.Context) (shutdown func(context.Context) error, err error) {
-	exp, err := newExporter(ctx)
+func InitTracer(ctx context.Context, url string, tracerName string, serviceName string) (tracer trace.Tracer, shutdown func(context.Context) error, err error) {
+	exporter, err := tracing.NewJaegerExporter(ctx, url)
 	if err != nil {
-		log.Fatalf("failed to initialize exporter: %v", err)
+		return nil, nil, err
 	}
 
-	// Create a new tracer provider with a batch span processor and the given exporter.
-	tp := newTraceProvider(exp)
-
-	otel.SetTracerProvider(tp)
-
-	// Finally, set the tracer that can be used for this package.
-	tracer = tp.Tracer("example.io/package/name")
-
-	go func() {
-		for {
-			time.Sleep(time.Second)
-			tp.ForceFlush(ctx)
-		}
-	}()
-
-	return tp.Shutdown, nil
-}
-
-func newExporter(ctx context.Context) (*stdouttrace.Exporter, error) {
-	// Your preferred exporter: console, jaeger, zipkin, OTLP, etc.
-	return stdouttrace.New(stdouttrace.WithPrettyPrint())
-}
-
-func newTraceProvider(exp sdktrace.SpanExporter) *sdktrace.TracerProvider {
-	// Ensure default SDK resources and the required service name are set.
-	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName("ExampleService"),
-		),
-	)
-
+	provider, err := tracing.NewTraceProvider(exporter, serviceName)
 	if err != nil {
-		panic(err)
+		return nil, nil, err
 	}
 
-	return sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(r),
-	)
+	otel.SetTracerProvider(provider)
+
+	tracer = provider.Tracer(tracerName)
+
+	return tracer, provider.Shutdown, nil
 }

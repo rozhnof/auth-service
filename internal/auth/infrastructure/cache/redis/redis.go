@@ -20,8 +20,8 @@ type Redis struct {
 	client *redis.Client
 }
 
-func (r *Redis) Client() *redis.Client {
-	return r.client
+func (r *Redis) Close(ctx context.Context) error {
+	return r.client.Close()
 }
 
 func NewRedis(ctx context.Context, cfg RedisConfig) (*Redis, error) {

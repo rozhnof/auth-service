@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,7 +31,7 @@ type RefreshResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/refresh [post]
 func (h *AuthHandler) Refresh(c *gin.Context) {
-	ctx, span := otel.Tracer("tracerName").Start(c.Request.Context(), "Refresh User")
+	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Refresh")
 	defer span.End()
 
 	log := h.log.With(

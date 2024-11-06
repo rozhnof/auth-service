@@ -40,6 +40,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		if err := app.Close(ctx); err != nil {
+			log.Println(err)
+		}
+	}()
 
 	go func() {
 		if err := app.Run(ctx); err != nil {

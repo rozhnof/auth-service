@@ -32,7 +32,7 @@ type LoginResponse struct {
 // @Router /auth/login [post]
 func (h *AuthHandler) Login(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Login")
-	span.End()
+	defer span.End()
 
 	log := h.log.With(
 		slog.String("function", "AuthHandler.Login"),

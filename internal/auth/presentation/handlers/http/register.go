@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel"
 )
 
 type RegisterRequest struct {
@@ -28,7 +27,7 @@ type RegisterResponse struct {
 // @Failure 500 {string} string "Internal Server Error"
 // @Router /auth/register [post]
 func (h *AuthHandler) Register(c *gin.Context) {
-	ctx, span := otel.Tracer("tracerName").Start(c.Request.Context(), "Register User")
+	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Register")
 	defer span.End()
 
 	log := h.log.With(
