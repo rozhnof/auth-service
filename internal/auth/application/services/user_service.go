@@ -115,6 +115,8 @@ func (s *UserService) Register(ctx context.Context, username string, password st
 		return nil, err
 	}
 
+	s.UserCache.Set(ctx, username, *createdUser, ttl)
+
 	return createdUser, nil
 }
 
@@ -194,7 +196,7 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at stri
 		return "", "", err
 	}
 
-	session.RefreshToken = newRefreshToken
+	// session.RefreshToken = newRefreshToken
 
 	if _, err := s.SessionRepository.Update(ctx, session); err != nil {
 		return "", "", err

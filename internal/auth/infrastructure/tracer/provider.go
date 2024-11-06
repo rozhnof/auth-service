@@ -19,7 +19,9 @@ func NewTraceProvider(exp sdktrace.SpanExporter, serviceName string) (*sdktrace.
 	}
 
 	return sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(exp),
+		sdktrace.WithBatcher(
+			exp,
+		),
 		sdktrace.WithResource(r),
 	), nil
 }
