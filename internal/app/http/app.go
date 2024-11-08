@@ -110,11 +110,12 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 		authHandler = http_handlers.NewAuthHandler(userService, log, tracer)
 	)
 
-	if cfg.Mode == "debug" {
+	switch cfg.Mode {
+	case "debug":
 		gin.SetMode(gin.DebugMode)
-	} else if cfg.Mode == "release" {
+	case "release":
 		gin.SetMode(gin.ReleaseMode)
-	} else {
+	default:
 		return nil, fmt.Errorf("invalid mode: %s", cfg.Mode)
 	}
 
@@ -132,8 +133,8 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	InitAuthRoutes(router, authHandler)
 
 	// Init monitoring
-	//prometheus.MustRegister(requestsTotal, requestDuration)
-	//go http.ListenAndServe(":9091", promhttp.Handler())
+	// prometheus.MustRegister(requestsTotal, requestDuration)
+	// go http.ListenAndServe(":9091", promhttp.Handler())
 
 	var (
 		server = InitHTTPServer(ctx, cfg, router)

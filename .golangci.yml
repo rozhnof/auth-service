@@ -1,0 +1,43 @@
+linters:
+  enable:
+    - errcheck         # Проверка на не обрабатываемые ошибки
+    - gocritic         # Статический анализ кода с улучшениями для Go
+    - gosimple         # Простейший анализ Go-кода
+    - govet            # Проверка кода на ошибки (встроенная в Go)
+    - revive           # Линтер для стиля кода (заменяет golint)
+    - staticcheck      # Проверка на потенциальные ошибки и улучшения
+    - ineffassign      # Проверка на неэффективное присваивание переменных
+    - unused           # Проверка на неиспользуемый код (заменяет deadcode и varcheck)
+    - unconvert        # Проверка на ненужные преобразования типов
+
+run:
+  # Игнорировать каталоги и файлы
+  issues:
+    exclude-dirs:
+      - vendor
+      - third_party
+    exclude-files:
+      - .*test\.go
+    exclude-rules:
+      - "gocritic"
+      - "staticcheck"
+
+  # Включить параллельное выполнение линтинга
+  concurrency: 4
+
+  # Максимальное количество ошибок, после которых линтер завершит выполнение с ошибкой
+  max-same-issues: 3
+
+  # Максимальное количество времени на выполнение линтинга (например, 5 минут)
+  timeout: 5m
+
+  # Формат вывода (можно выбрать "json", "plain", "checkstyle", "github", etc.)
+  format: "json"
+  issues-exit-code: 1
+
+  # Параметры для вывода
+  print-issued-lines: true
+  color: true
+
+  # Включить/выключить работу с CI/CD
+  ci: false

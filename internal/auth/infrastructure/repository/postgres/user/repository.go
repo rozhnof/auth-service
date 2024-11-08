@@ -34,19 +34,10 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 	ctx, span := s.tracer.Start(ctx, "UserRepository.Create")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.Create"),
-		slog.String("username", user.Username),
-	)
-
-	log.Debug("create user start", slog.String("password", user.HashPassword))
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.Create, user.Username, user.HashPassword)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -56,8 +47,6 @@ func (s *UserRepository) Create(ctx context.Context, user *models.User) (*models
 		return nil, err
 	}
 
-	log.Debug("create user end")
-
 	return &createdUser, nil
 }
 
@@ -65,19 +54,10 @@ func (s *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*models
 	ctx, span := s.tracer.Start(ctx, "UserRepository.GetByID")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.GetByID"),
-		slog.String("user_id", userID.String()),
-	)
-
-	log.Debug("get user by id start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.GetByID, userID)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -86,8 +66,6 @@ func (s *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*models
 	if err != nil {
 		return nil, err
 	}
-
-	log.Debug("get user by id end")
 
 	return &user, nil
 }
@@ -96,19 +74,10 @@ func (s *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 	ctx, span := s.tracer.Start(ctx, "UserRepository.GetByUsername")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.GetByUsername"),
-		slog.String("username", username),
-	)
-
-	log.Debug("get user by username start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.GetByUsername, username)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -118,8 +87,6 @@ func (s *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 		return nil, err
 	}
 
-	log.Debug("get user by username end")
-
 	return &user, nil
 }
 
@@ -127,18 +94,10 @@ func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
 	ctx, span := s.tracer.Start(ctx, "UserRepository.List")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.List"),
-	)
-
-	log.Debug("list user start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.List)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -148,8 +107,6 @@ func (s *UserRepository) List(ctx context.Context) ([]models.User, error) {
 		return nil, err
 	}
 
-	log.Debug("list user end")
-
 	return userList, nil
 }
 
@@ -157,19 +114,10 @@ func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models
 	ctx, span := s.tracer.Start(ctx, "UserRepository.Update")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.Update"),
-		slog.String("username", user.Username),
-	)
-
-	log.Debug("update user start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.Update, user.Username, user.HashPassword)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -179,8 +127,6 @@ func (s *UserRepository) Update(ctx context.Context, user *models.User) (*models
 		return nil, err
 	}
 
-	log.Debug("update user end")
-
 	return &updatedUser, nil
 }
 
@@ -188,19 +134,10 @@ func (s *UserRepository) Delete(ctx context.Context, userID uuid.UUID) (*time.Ti
 	ctx, span := s.tracer.Start(ctx, "UserRepository.Delete")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.Create"),
-		slog.String("user_id", userID.String()),
-	)
-
-	log.Debug("delete user start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.Delete, userID)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -209,8 +146,6 @@ func (s *UserRepository) Delete(ctx context.Context, userID uuid.UUID) (*time.Ti
 	if err != nil {
 		return nil, err
 	}
-
-	log.Debug("delete user end")
 
 	return &deletedAt, nil
 }

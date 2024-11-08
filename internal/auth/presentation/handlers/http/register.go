@@ -46,7 +46,5 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		User: UserToDTO(*registeredUser),
 	}
 
-	bytes, _ := response.MarshalJSON()
-
-	c.Data(http.StatusOK, "application/json", bytes)
+	c.JSON(http.StatusOK, response)
 }

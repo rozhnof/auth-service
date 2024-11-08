@@ -14,11 +14,6 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(service *services.UserService, log *slog.Logger, tracer trace.Tracer) *AuthHandler {
-	log = log.With(
-		slog.String("layer", "presentation"),
-		slog.String("pkg", "http_handlers"),
-	)
-
 	return &AuthHandler{
 		userService: service,
 		log:         log,

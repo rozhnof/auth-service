@@ -25,7 +25,7 @@ func New(ctx context.Context, cfg Config, handler http.Handler) *HTTPServer {
 			Addr:         cfg.Address,
 			TLSConfig:    cfg.TLSConfig,
 			Handler:      handler,
-			BaseContext:  func(l net.Listener) context.Context { return ctx },
+			BaseContext:  func(net.Listener) context.Context { return ctx },
 			ReadTimeout:  time.Second,
 			WriteTimeout: 10 * time.Second,
 		},
@@ -35,11 +35,11 @@ func New(ctx context.Context, cfg Config, handler http.Handler) *HTTPServer {
 	return s
 }
 
-func (s *HTTPServer) Run(ctx context.Context) error {
+func (s *HTTPServer) Run(_ context.Context) error {
 	return s.srv.ListenAndServe()
 }
 
-func (s *HTTPServer) RunTLS(ctx context.Context) error {
+func (s *HTTPServer) RunTLS(_ context.Context) error {
 	return s.srv.ListenAndServeTLS("", "")
 }
 

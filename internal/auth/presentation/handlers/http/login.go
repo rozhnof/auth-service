@@ -56,7 +56,5 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		RefreshToken: rt,
 	}
 
-	bytes, _ := response.MarshalJSON()
-
-	c.Data(http.StatusOK, "application/json", bytes)
+	c.JSON(http.StatusOK, response)
 }

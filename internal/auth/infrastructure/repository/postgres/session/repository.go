@@ -37,13 +37,6 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.Create")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "SessionRepository.Create"),
-		slog.String("user_id", session.UserID.String()),
-	)
-
-	log.Debug("create session start")
-
 	sessionEntity := SessionToEntity(session)
 
 	args := []any{
@@ -57,8 +50,6 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 
 	rows, err := db.Query(ctx, queries.Create, args...)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -68,8 +59,6 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 		return nil, err
 	}
 
-	log.Debug("create user end")
-
 	return SessionToModel(&createdSessionEntity), nil
 }
 
@@ -77,18 +66,10 @@ func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken 
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.GetByRefreshToken")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "SessionRepository.GetByRefreshToken"),
-	)
-
-	log.Debug("get session by refresh token start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.GetByRefreshToken, refreshToken)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -97,8 +78,6 @@ func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken 
 	if err != nil {
 		return nil, err
 	}
-
-	log.Debug("get session by refresh token end")
 
 	return SessionToModel(&sessionEntity), nil
 }
@@ -107,19 +86,10 @@ func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.GetByID")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "SessionRepository.GetByID"),
-		slog.String("session_id", sessionID.String()),
-	)
-
-	log.Debug("get session by id end")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.GetByID, sessionID)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -129,21 +99,12 @@ func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*
 		return nil, err
 	}
 
-	log.Debug("get session by id end")
-
 	return SessionToModel(&sessionEntity), nil
 }
 
 func (s *SessionRepository) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.Update")
 	defer span.End()
-
-	log := s.log.With(
-		slog.String("function", "SessionRepository.Update"),
-		slog.String("session_id", session.ID.String()),
-	)
-
-	log.Debug("update session start")
 
 	sessionEntity := SessionToEntity(session)
 
@@ -159,8 +120,6 @@ func (s *SessionRepository) Update(ctx context.Context, session *models.Session)
 
 	rows, err := db.Query(ctx, queries.Update, args...)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -170,8 +129,6 @@ func (s *SessionRepository) Update(ctx context.Context, session *models.Session)
 		return nil, err
 	}
 
-	log.Debug("update session end")
-
 	return SessionToModel(&updatedSessionEntity), nil
 }
 
@@ -179,19 +136,10 @@ func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*t
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.Delete")
 	defer span.End()
 
-	log := s.log.With(
-		slog.String("function", "UserRepository.Create"),
-		slog.String("session_id", sessionID.String()),
-	)
-
-	log.Debug("delete session start")
-
 	db := s.txManager.TxOrDB(ctx)
 
 	rows, err := db.Query(ctx, queries.Delete, sessionID)
 	if err != nil {
-		log.Info("failed to execute postgres query", slog.Any("error", err.Error()))
-
 		return nil, err
 	}
 	defer rows.Close()
@@ -200,8 +148,6 @@ func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*t
 	if err != nil {
 		return nil, err
 	}
-
-	log.Debug("delete session end")
 
 	return &deletedAt, nil
 }

@@ -84,11 +84,6 @@ func NewUserService(d Dependencies, log *slog.Logger, tracer trace.Tracer) (*Use
 		return nil, errors.Wrap(err, "missing required dependency")
 	}
 
-	log = log.With(
-		slog.String("layer", "application"),
-		slog.String("pkg", "services"),
-	)
-
 	return &UserService{
 		Dependencies: d,
 		log:          log,
