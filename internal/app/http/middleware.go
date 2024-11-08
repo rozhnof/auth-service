@@ -28,18 +28,36 @@ func LogMiddleware(log *slog.Logger) gin.HandlerFunc {
 
 		duration := time.Since(start)
 
-		log = log.With(
-			slog.String("method", c.Request.Method),
-			slog.String("path", c.Request.URL.Path),
-			slog.Int("status", c.Writer.Status()),
-			slog.String("address", c.Request.RemoteAddr),
-			slog.String("duration", duration.String()),
-		)
-
 		if c.Writer.Status() >= 500 {
-			log.Info("internal server error")
+			log.InfoContext(
+				c.Request.Context(),
+				"internal server error",
+				slog.String("method", c.Request.Method),
+				slog.String("path", c.Request.URL.Path),
+				slog.Int("status", c.Writer.Status()),
+				slog.String("address", c.Request.RemoteAddr),
+				slog.String("duration", duration.String()),
+			)
 		} else if duration > time.Second {
-			log.Info("long time response")
+			log.InfoContext(
+				c.Request.Context(),
+				"long time response",
+				slog.String("method", c.Request.Method),
+				slog.String("path", c.Request.URL.Path),
+				slog.Int("status", c.Writer.Status()),
+				slog.String("address", c.Request.RemoteAddr),
+				slog.String("duration", duration.String()),
+			)
+		} else {
+			log.InfoContext(
+				c.Request.Context(),
+				"incoming request",
+				slog.String("method", c.Request.Method),
+				slog.String("path", c.Request.URL.Path),
+				slog.Int("status", c.Writer.Status()),
+				slog.String("address", c.Request.RemoteAddr),
+				slog.String("duration", duration.String()),
+			)
 		}
 	}
 }

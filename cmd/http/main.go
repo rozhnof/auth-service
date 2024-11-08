@@ -10,6 +10,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/go-slog/otelslog"
 )
 
 const (
@@ -77,7 +79,9 @@ func NewLogger(cfg config.LoggerConfig) (*slog.Logger, error) {
 		return nil, err
 	}
 
-	handler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
+	jsonHandler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{Level: level})
+
+	handler := otelslog.NewHandler(jsonHandler)
 
 	return slog.New(handler), nil
 }

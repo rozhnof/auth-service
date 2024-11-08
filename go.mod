@@ -52,6 +52,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.22.1 // indirect
+	github.com/go-slog/otelslog v0.3.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
@@ -80,6 +81,8 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/redis/go-redis/extra/rediscmd/v9 v9.7.0 // indirect
 	github.com/redis/go-redis/extra/redisotel/v9 v9.7.0 // indirect
+	github.com/samber/lo v1.47.0 // indirect
+	github.com/samber/slog-multi v1.2.4 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
 	go.opentelemetry.io/otel/metric v1.31.0 // indirect
