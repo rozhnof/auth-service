@@ -43,7 +43,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	at, rt, err := h.userService.Refresh(ctx, request.RefreshToken)
 	if err != nil {
 		if errors.Is(err, services.ErrUnauthorizedRefresh) {
-			c.String(http.StatusUnauthorized, "invalid refresh token")
+			c.String(http.StatusUnauthorized, "Unauthorized refresh token")
 			return
 		}
 

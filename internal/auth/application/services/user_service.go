@@ -156,6 +156,10 @@ func (s *UserService) Login(ctx context.Context, username string, password strin
 		RefreshToken: refreshToken,
 	}
 
+	if err := s.SessionRepository.RevokeByUserID(ctx, user.ID); err != nil {
+		return "", "", err
+	}
+
 	if _, err := s.SessionRepository.Create(ctx, session); err != nil {
 		return "", "", err
 	}
@@ -172,15 +176,6 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at stri
 	ctx, span := s.tracer.Start(ctx, "UserService.Refresh")
 	defer span.End()
 
-	session, err := s.SessionRepository.GetByRefreshToken(ctx, refreshToken)
-	if err != nil {
-		return "", "", err
-	}
-
-	if !session.Valid() {
-		return "", "", ErrUnauthorizedRefresh
-	}
-
 	newAccessToken, err := s.AtManager.NewToken()
 	if err != nil {
 		return "", "", err
@@ -191,14 +186,29 @@ func (s *UserService) Refresh(ctx context.Context, refreshToken string) (at stri
 		return "", "", err
 	}
 
-	session.RefreshToken = newRefreshToken
-
-	if _, err := s.SessionRepository.Update(ctx, session); err != nil {
-		return "", "", err
-	}
-
 	at = newAccessToken.Token
 	rt = newRefreshToken.Token
+
+	if err := s.TxManager.WithTransaction(ctx, func(ctx context.Context) error {
+		session, err := s.SessionRepository.GetByRefreshToken(ctx, refreshToken)
+		if err != nil {
+			return ErrUnauthorizedRefresh
+		}
+
+		if !session.Valid() {
+			return ErrUnauthorizedRefresh
+		}
+
+		session.RefreshToken = newRefreshToken
+
+		if _, err := s.SessionRepository.Update(ctx, session); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return "", "", err
+	}
 
 	return at, rt, nil
 }

@@ -151,3 +151,17 @@ func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*t
 
 	return &deletedAt, nil
 }
+
+func (s *SessionRepository) RevokeByUserID(ctx context.Context, userID uuid.UUID) error {
+	ctx, span := s.tracer.Start(ctx, "SessionRepository.RevokeByUserID")
+	defer span.End()
+
+	db := s.txManager.TxOrDB(ctx)
+
+	_, err := db.Exec(ctx, queries.Revoke, userID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

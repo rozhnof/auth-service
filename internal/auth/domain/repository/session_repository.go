@@ -14,6 +14,7 @@ type SessionRepository interface {
 	GetByRefreshToken(ctx context.Context, refreshToken string) (*models.Session, error)
 	Update(ctx context.Context, session *models.Session) (*models.Session, error)
 	Delete(ctx context.Context, sessionID uuid.UUID) (*time.Time, error)
+	RevokeByUserID(ctx context.Context, userID uuid.UUID) error
 }
 
 type SessionCache interface {
