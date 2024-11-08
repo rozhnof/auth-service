@@ -1,9 +1,10 @@
-package postgres_session_repository
+package pg_entity
 
 import (
 	"auth/internal/auth/domain/models"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Session struct {

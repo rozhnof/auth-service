@@ -1,4 +1,4 @@
-package redis_cache
+package rediscache
 
 import (
 	"auth/internal/auth/domain/models"

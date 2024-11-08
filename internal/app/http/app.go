@@ -2,9 +2,8 @@ package http_app
 
 import (
 	"auth/internal/auth/application/services"
-	redis_cache "auth/internal/auth/infrastructure/cache/redis"
-	postgres_session_repository "auth/internal/auth/infrastructure/repository/postgres/session"
-	postgres_user_repository "auth/internal/auth/infrastructure/repository/postgres/user"
+	rediscache "auth/internal/auth/infrastructure/cache/redis"
+	pgrepo "auth/internal/auth/infrastructure/repository/postgres"
 	tracing "auth/internal/auth/infrastructure/tracer"
 	http_handlers "auth/internal/auth/presentation/handlers/http"
 	"auth/internal/pkg/config"
@@ -74,8 +73,8 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	}
 
 	var (
-		userCache    = redis_cache.NewUserCache(redisCache)
-		sessionCache = redis_cache.NewSessionCache(redisCache)
+		userCache    = rediscache.NewUserCache(redisCache)
+		sessionCache = rediscache.NewSessionCache(redisCache)
 	)
 
 	var (
@@ -86,8 +85,8 @@ func NewApp(ctx context.Context, cfg *config.Config, log *slog.Logger) (*App, er
 	)
 
 	var (
-		userRepository    = postgres_user_repository.NewUserRepository(postgresDatabase, txManager, log, tracer)
-		sessionRepository = postgres_session_repository.NewSessionRepository(postgresDatabase, txManager, log, tracer)
+		userRepository    = pgrepo.NewUserRepository(postgresDatabase, txManager, log, tracer)
+		sessionRepository = pgrepo.NewSessionRepository(postgresDatabase, txManager, log, tracer)
 	)
 
 	userServiceDependencies := services.Dependencies{

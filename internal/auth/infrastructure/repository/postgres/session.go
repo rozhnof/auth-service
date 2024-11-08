@@ -1,8 +1,9 @@
-package postgres_session_repository
+package pgrepo
 
 import (
 	"auth/internal/auth/domain/models"
-	queries "auth/internal/auth/infrastructure/repository/postgres/session/queries"
+	pg_entity "auth/internal/auth/infrastructure/repository/postgres/entity"
+	queries "auth/internal/auth/infrastructure/repository/postgres/queries/session"
 	pgxdb "auth/internal/pkg/database/postgres"
 	"context"
 	"log/slog"
@@ -37,7 +38,7 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.Create")
 	defer span.End()
 
-	sessionEntity := SessionToEntity(session)
+	sessionEntity := pg_entity.SessionToEntity(session)
 
 	args := []any{
 		sessionEntity.UserID,
@@ -54,12 +55,12 @@ func (s *SessionRepository) Create(ctx context.Context, session *models.Session)
 	}
 	defer rows.Close()
 
-	createdSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	createdSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[pg_entity.Session])
 	if err != nil {
 		return nil, err
 	}
 
-	return SessionToModel(&createdSessionEntity), nil
+	return pg_entity.SessionToModel(&createdSessionEntity), nil
 }
 
 func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken string) (*models.Session, error) {
@@ -74,12 +75,12 @@ func (s *SessionRepository) GetByRefreshToken(ctx context.Context, refreshToken 
 	}
 	defer rows.Close()
 
-	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[pg_entity.Session])
 	if err != nil {
 		return nil, err
 	}
 
-	return SessionToModel(&sessionEntity), nil
+	return pg_entity.SessionToModel(&sessionEntity), nil
 }
 
 func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*models.Session, error) {
@@ -94,19 +95,19 @@ func (s *SessionRepository) GetByID(ctx context.Context, sessionID uuid.UUID) (*
 	}
 	defer rows.Close()
 
-	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	sessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[pg_entity.Session])
 	if err != nil {
 		return nil, err
 	}
 
-	return SessionToModel(&sessionEntity), nil
+	return pg_entity.SessionToModel(&sessionEntity), nil
 }
 
 func (s *SessionRepository) Update(ctx context.Context, session *models.Session) (*models.Session, error) {
 	ctx, span := s.tracer.Start(ctx, "SessionRepository.Update")
 	defer span.End()
 
-	sessionEntity := SessionToEntity(session)
+	sessionEntity := pg_entity.SessionToEntity(session)
 
 	args := []any{
 		sessionEntity.ID,
@@ -124,12 +125,12 @@ func (s *SessionRepository) Update(ctx context.Context, session *models.Session)
 	}
 	defer rows.Close()
 
-	updatedSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Session])
+	updatedSessionEntity, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[pg_entity.Session])
 	if err != nil {
 		return nil, err
 	}
 
-	return SessionToModel(&updatedSessionEntity), nil
+	return pg_entity.SessionToModel(&updatedSessionEntity), nil
 }
 
 func (s *SessionRepository) Delete(ctx context.Context, sessionID uuid.UUID) (*time.Time, error) {

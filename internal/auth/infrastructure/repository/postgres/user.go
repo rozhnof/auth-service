@@ -1,8 +1,8 @@
-package postgres_user_repository
+package pgrepo
 
 import (
 	"auth/internal/auth/domain/models"
-	queries "auth/internal/auth/infrastructure/repository/postgres/user/queries"
+	queries "auth/internal/auth/infrastructure/repository/postgres/queries/user"
 	pgxdb "auth/internal/pkg/database/postgres"
 	"context"
 	"log/slog"
