@@ -1,0 +1,18 @@
+mode: release # debug, release
+
+server:
+  address: :8080
+
+logging:
+  level: info
+
+tokens:
+  access_ttl: 15m
+  refresh_ttl: 720h
+
+tracing:
+  output: stdout # jaeger, stdout
+  name: auth-service-tracer
+
+cache:
+  referral_code_ttl: 24h

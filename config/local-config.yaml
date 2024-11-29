@@ -1,0 +1,26 @@
+mode: release # debug, release
+
+server:
+  address: :8080
+
+logging:
+  level: info
+  # path: 
+
+tokens:
+  access_ttl: 10h
+  refresh_ttl: 720h
+
+tracing:
+  output: jaeger # jaeger, stdout
+  name: auth-service-tracer
+  endpoint: localhost:4318
+
+cache:
+  referral_code_ttl: 24h
+
+kafka:
+  brokers:
+    - localhost:9091
+    - localhost:9092
+    - localhost:9093

@@ -1,0 +1,26 @@
+mode: release # debug, release
+
+server:
+  address: :8080
+
+logging:
+  level: info
+  # path: 
+
+tokens:
+  access_ttl: 15m
+  refresh_ttl: 720h
+
+tracing:
+  output: jaeger # jaeger, stdout
+  name: auth-service-tracer
+  endpoint: jaeger:4318
+
+cache:
+  referral_code_ttl: 24h
+
+kafka:
+  brokers:
+    - kafka1:29091
+    - kafka2:29092
+    - kafka3:29093
