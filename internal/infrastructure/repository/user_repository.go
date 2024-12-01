@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/pkg/errors"
-	"github.com/rozhnof/auth-service/internal/application/services"
+	repo "github.com/rozhnof/auth-service/internal/application/repository"
 	"github.com/rozhnof/auth-service/internal/domain/entities"
 	db_queries "github.com/rozhnof/auth-service/internal/infrastructure/repository/queries"
 	trm "github.com/rozhnof/auth-service/pkg/transaction_manager"
@@ -49,7 +49,7 @@ func (s *UserRepository) Create(ctx context.Context, user *entities.User) error 
 
 			if errors.As(err, &pgErr) {
 				if pgErr.Code == pgerrcode.UniqueViolation {
-					return errors.Wrapf(services.ErrDuplicate, "user with email = %s already exists", user.Email())
+					return errors.Wrapf(repo.ErrDuplicate, "user with email = %s already exists", user.Email())
 				}
 			}
 
@@ -137,7 +137,7 @@ func (s *UserRepository) Update(ctx context.Context, user *entities.User) error 
 
 		if err := querier.UpdateUser(ctx, userArgs); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return errors.Wrapf(services.ErrObjectNotFound, "user with email = %s not exists", user.Email())
+				return errors.Wrapf(repo.ErrObjectNotFound, "user with email = %s not exists", user.Email())
 			}
 
 			return err
@@ -196,7 +196,7 @@ func (s *UserRepository) GetByID(ctx context.Context, userID uuid.UUID) (*entiti
 		userRow, err := querier.GetUserByID(ctx, userID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return errors.Wrapf(services.ErrObjectNotFound, "user with id = %s not exists", userID.String())
+				return errors.Wrapf(repo.ErrObjectNotFound, "user with id = %s not exists", userID.String())
 			}
 
 			return err
@@ -249,7 +249,7 @@ func (s *UserRepository) GetByEmail(ctx context.Context, email string) (*entitie
 		userRow, err := querier.GetUserByEmail(ctx, email)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return errors.Wrapf(services.ErrObjectNotFound, "user with email = %s not exists", email)
+				return errors.Wrapf(repo.ErrObjectNotFound, "user with email = %s not exists", email)
 			}
 
 			return err
@@ -302,7 +302,7 @@ func (s *UserRepository) GetByRefreshToken(ctx context.Context, refreshToken str
 		userRow, err := querier.GetUserByRefreshToken(ctx, refreshToken)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return errors.Wrapf(services.ErrObjectNotFound, "user with refresh token = %s not exists", refreshToken)
+				return errors.Wrapf(repo.ErrObjectNotFound, "user with refresh token = %s not exists", refreshToken)
 			}
 
 			return err
@@ -338,7 +338,7 @@ func (s *UserRepository) GetByRefreshToken(ctx context.Context, refreshToken str
 	return user, nil
 }
 
-func (s *UserRepository) List(ctx context.Context, filters *services.UserFilters, pagination *services.Pagination) ([]entities.User, error) {
+func (s *UserRepository) List(ctx context.Context, filters *repo.UserFilters, pagination *repo.Pagination) ([]entities.User, error) {
 	ctx, span := s.tracer.Start(ctx, "UserRepository.List")
 	defer span.End()
 

@@ -1,20 +1,10 @@
 package services
 
-import (
-	"context"
-)
-
-type LoginMessage struct {
-	Email string `json:"email"`
-}
+import "context"
 
 type RegisterMessage struct {
 	Email       string `json:"email"`
 	ConfirmLink string `json:"confirm_link"`
-}
-
-type LoginMessageSender interface {
-	SendMessage(context.Context, LoginMessage) error
 }
 
 type RegisterMessageSender interface {

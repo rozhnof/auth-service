@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	repo "github.com/rozhnof/auth-service/internal/application/repository"
 	"github.com/rozhnof/auth-service/internal/application/services"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -76,7 +77,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 	registeredUser, err := h.authService.Register(ctx, request.Email, request.Password)
 	if err != nil {
-		if errors.Is(err, services.ErrDuplicate) {
+		if errors.Is(err, repo.ErrDuplicate) {
 			c.String(http.StatusConflict, err.Error())
 			return
 		}
@@ -115,7 +116,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	at, rt, err := h.authService.Login(ctx, request.Email, request.Password)
 	if err != nil {
-		if errors.Is(err, services.ErrObjectNotFound) {
+		if errors.Is(err, repo.ErrObjectNotFound) {
 			c.String(http.StatusNotFound, err.Error())
 			return
 		}
@@ -160,7 +161,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 
 	at, rt, err := h.authService.Refresh(ctx, request.RefreshToken)
 	if err != nil {
-		if errors.Is(err, services.ErrObjectNotFound) {
+		if errors.Is(err, repo.ErrObjectNotFound) {
 			c.String(http.StatusUnauthorized, err.Error())
 			return
 		}

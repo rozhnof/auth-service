@@ -1,8 +1,6 @@
-package services
+package repo
 
-import (
-	"errors"
-)
+import "errors"
 
 var (
 	ErrObjectNotFound = errors.New("object not found")

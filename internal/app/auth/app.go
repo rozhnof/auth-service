@@ -88,10 +88,10 @@ func NewApp(
 
 		authService = services.NewAuthService(
 			userRepository,
-			loginMessageSender,
-			registerMessageSender,
 			txManager,
 			secretManager,
+			loginMessageSender,
+			registerMessageSender,
 			logger,
 			tracer,
 			authServiceConfig,

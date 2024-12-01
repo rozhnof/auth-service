@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	repo "github.com/rozhnof/auth-service/internal/application/repository"
 	"github.com/rozhnof/auth-service/internal/domain"
 	"github.com/rozhnof/auth-service/internal/domain/entities"
 	vobjects "github.com/rozhnof/auth-service/internal/domain/value_objects"
@@ -19,32 +20,32 @@ type AuthServiceConfig struct {
 }
 
 type AuthService struct {
-	repository        UserRepository
+	repository        repo.UserRepository
+	txManager         repo.TransactionManager
+	secretManager     SecretManager
 	loginMsgSender    LoginMessageSender
 	registerMsgSender RegisterMessageSender
-	txManager         TransactionManager
-	secretManager     SecretManager
 	log               *slog.Logger
 	tracer            trace.Tracer
 	cfg               AuthServiceConfig
 }
 
 func NewAuthService(
-	repository UserRepository,
+	repository repo.UserRepository,
+	txManager repo.TransactionManager,
+	secretManager SecretManager,
 	loginMsgSender LoginMessageSender,
 	registerMsgSender RegisterMessageSender,
-	txManager TransactionManager,
-	secretManager SecretManager,
 	log *slog.Logger,
 	tracer trace.Tracer,
 	cfg AuthServiceConfig,
 ) *AuthService {
 	return &AuthService{
 		repository:        repository,
-		loginMsgSender:    loginMsgSender,
-		registerMsgSender: registerMsgSender,
 		txManager:         txManager,
 		secretManager:     secretManager,
+		loginMsgSender:    loginMsgSender,
+		registerMsgSender: registerMsgSender,
 		log:               log,
 		tracer:            tracer,
 		cfg:               cfg,

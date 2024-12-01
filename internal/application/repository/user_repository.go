@@ -1,4 +1,4 @@
-package services
+package repo
 
 import (
 	"context"
@@ -6,10 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rozhnof/auth-service/internal/domain/entities"
 )
-
-type UserFilters struct {
-	UserIDs []uuid.UUID
-}
 
 type UserRepository interface {
 	Create(ctx context.Context, user *entities.User) error
