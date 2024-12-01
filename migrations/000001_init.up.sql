@@ -1,14 +1,23 @@
 CREATE TABLE users (
     id UUID PRIMARY KEY,
     email VARCHAR(50) NOT NULL UNIQUE,
-    hash_password TEXT NOT NULL,
+    confirmed BOOL NOT NULL DEFAULT FALSE,
+    hash_password CHAR(60) NOT NULL,
     deleted_at TIMESTAMP NULL
 );
 
 CREATE TABLE refresh_token (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
     user_id UUID REFERENCES users (id) NOT NULL,
-    refresh_token VARCHAR(255) NOT NULL UNIQUE,
+    token VARCHAR NOT NULL UNIQUE,
+    expired_at TIMESTAMP NOT NULL,
+    deleted_at TIMESTAMP NULL
+);
+
+CREATE TABLE register_token (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid (),
+    user_id UUID REFERENCES users (id) NOT NULL,
+    token VARCHAR NOT NULL UNIQUE,
     expired_at TIMESTAMP NOT NULL,
     deleted_at TIMESTAMP NULL
 );
