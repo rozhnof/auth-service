@@ -3,6 +3,7 @@ module github.com/rozhnof/auth-service
 go 1.22.4
 
 require (
+	github.com/IBM/sarama v1.43.3
 	github.com/exaring/otelpgx v0.6.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/go-slog/otelslog v0.3.0
@@ -33,7 +34,6 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/IBM/sarama v1.43.3 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/bytedance/sonic v1.12.4 // indirect
 	github.com/bytedance/sonic/loader v0.2.1 // indirect
