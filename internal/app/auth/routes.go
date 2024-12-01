@@ -11,6 +11,7 @@ func InitRoutes(router gin.IRoutes, authHandler *handlers.AuthHandler, googleAut
 	router.POST("/auth/register", authHandler.Register)
 	router.POST("/auth/login", authHandler.Login)
 	router.POST("/auth/refresh", authHandler.Refresh)
+	router.GET("/auth/confirm", authHandler.Confirm)
 
 	router.GET("/auth/google/login", googleAuthHandler.Login)
 	router.GET("/auth/google/callback", googleAuthHandler.Callback)

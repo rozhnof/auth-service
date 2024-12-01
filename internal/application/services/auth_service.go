@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -55,7 +56,7 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email string) (*entities.U
 	defer span.End()
 
 	if user, err := s.repository.GetByEmail(ctx, email); err == nil {
-		if err := user.UpdateTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
+		if err := user.RefreshTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
 			return nil, err
 		}
 
@@ -82,19 +83,14 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email string) (*entities.U
 
 	const randomPasswordLen = 72
 
-	passwordStr, err := domain.GenerateRandomString(randomPasswordLen)
-	if err != nil {
-		return nil, err
-	}
-
-	password, err := vobjects.NewPassword(passwordStr)
+	password, err := vobjects.NewPassword(domain.GenerateRandomString(randomPasswordLen))
 	if err != nil {
 		return nil, err
 	}
 
 	user := entities.NewUser(email, password)
 
-	if err := user.UpdateTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
+	if err := user.RefreshTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +100,8 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email string) (*entities.U
 		}
 
 		registerMsg := RegisterMessage{
-			Email: email,
+			Email:       user.Email(),
+			ConfirmLink: createConfirmLink(user.Email(), user.RegisterToken().Token()),
 		}
 
 		if err := s.registerMsgSender.SendMessage(ctx, registerMsg); err != nil {
@@ -117,6 +114,32 @@ func (s *AuthService) OAuthLogin(ctx context.Context, email string) (*entities.U
 	}
 
 	return user, nil
+}
+
+func (s *AuthService) Confirm(ctx context.Context, email string, token string) error {
+	ctx, span := s.tracer.Start(ctx, "AuthService.Confirm")
+	defer span.End()
+
+	if err := s.txManager.WithTransaction(ctx, func(ctx context.Context) error {
+		user, err := s.repository.GetByEmail(ctx, email)
+		if err != nil {
+			return err
+		}
+
+		if err := user.Confirm(); err != nil {
+			return err
+		}
+
+		if err := s.repository.Update(ctx, user); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *AuthService) Register(ctx context.Context, email string, passwordStr string) (*entities.User, error) {
@@ -138,7 +161,8 @@ func (s *AuthService) Register(ctx context.Context, email string, passwordStr st
 		}
 
 		registerMsg := RegisterMessage{
-			Email: email,
+			Email:       user.Email(),
+			ConfirmLink: createConfirmLink(user.Email(), user.RegisterToken().Token()),
 		}
 
 		if err := s.registerMsgSender.SendMessage(ctx, registerMsg); err != nil {
@@ -167,7 +191,7 @@ func (s *AuthService) Login(ctx context.Context, email string, password string) 
 			return ErrInvalidPassword
 		}
 
-		if err := user.UpdateTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
+		if err := user.RefreshTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
 			return err
 		}
 
@@ -208,7 +232,7 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (at stri
 			return errors.Wrap(ErrUnauthorizedRefresh, "invalid refresh token")
 		}
 
-		if err := user.UpdateTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
+		if err := user.RefreshTokens(s.cfg.AccessTokenTTL, s.cfg.RefreshTokenTTL, s.secretManager.SecretKey().Get()); err != nil {
 			return err
 		}
 
@@ -225,4 +249,8 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (at stri
 	}
 
 	return at, rt, nil
+}
+
+func createConfirmLink(email string, token string) string {
+	return fmt.Sprintf("http://localhost:8080/auth/confirm?email=%s&register_token=%s", email, token)
 }

@@ -24,6 +24,34 @@ func NewAuthHandler(service *services.AuthService, log *slog.Logger, tracer trac
 	}
 }
 
+// Confirm godoc
+// @Summary Confirm user registration
+// @Description This endpoint confirms user registration using the provided email and register_token.
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param email query string true "User email"
+// @Param register_token query string true "Register token"
+// @Success 200 {string} string "OK"
+// @Failure 500 {string} string "Internal Server Error"
+// @Router /auth/confirm [post]
+func (h *AuthHandler) Confirm(c *gin.Context) {
+	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Confirm")
+	defer span.End()
+
+	var (
+		email         = c.Query("email")
+		registerToken = c.Query("register_token")
+	)
+
+	if err := h.authService.Confirm(ctx, email, registerToken); err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusOK)
+}
+
 // Register @Summary User registration
 // @Description Registers a new user with email and password
 // @Tags Auth
