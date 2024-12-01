@@ -9,7 +9,8 @@ type LoginMessage struct {
 }
 
 type RegisterMessage struct {
-	Email string `json:"email"`
+	Email       string `json:"email"`
+	ConfirmLink string `json:"confirm_link"`
 }
 
 type LoginMessageSender interface {
