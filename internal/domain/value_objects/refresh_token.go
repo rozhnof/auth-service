@@ -15,22 +15,15 @@ type RefreshToken struct {
 	expiredAt time.Time
 }
 
-func NewRefreshToken(ttl time.Duration) (RefreshToken, error) {
-	token, err := domain.GenerateRandomString(refreshTokenLength)
-	if err != nil {
-		return RefreshToken{}, err
-	}
-
-	rt := RefreshToken{
-		token:     token,
+func NewRefreshToken(ttl time.Duration) *RefreshToken {
+	return &RefreshToken{
+		token:     domain.GenerateRandomString(refreshTokenLength),
 		expiredAt: time.Now().Add(ttl),
 	}
-
-	return rt, nil
 }
 
-func NewExistingRefreshToken(token string, expiredAt time.Time) RefreshToken {
-	return RefreshToken{
+func NewExistingRefreshToken(token string, expiredAt time.Time) *RefreshToken {
+	return &RefreshToken{
 		token:     token,
 		expiredAt: expiredAt,
 	}

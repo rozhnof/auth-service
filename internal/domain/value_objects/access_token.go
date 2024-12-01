@@ -24,7 +24,7 @@ type AccessToken struct {
 	token string
 }
 
-func NewAccessToken(ttl time.Duration, secretKey []byte, payload AccessTokenPayload) (AccessToken, error) {
+func NewAccessToken(ttl time.Duration, secretKey []byte, payload AccessTokenPayload) (*AccessToken, error) {
 	claims := AccessTokenClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer: Issuer,
@@ -42,14 +42,12 @@ func NewAccessToken(ttl time.Duration, secretKey []byte, payload AccessTokenPayl
 
 	signedToken, err := token.SignedString(secretKey)
 	if err != nil {
-		return AccessToken{}, err
+		return nil, err
 	}
 
-	at := AccessToken{
+	return &AccessToken{
 		token: signedToken,
-	}
-
-	return at, nil
+	}, nil
 }
 
 func (t AccessToken) Token() string {

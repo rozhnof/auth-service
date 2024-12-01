@@ -1,9 +1,6 @@
 package domain
 
-import (
-	"crypto/rand"
-	"encoding/base64"
-)
+import "golang.org/x/exp/rand"
 
 type Secret []byte
 
@@ -15,11 +12,13 @@ func (s Secret) Get() []byte {
 	return s
 }
 
-func GenerateRandomString(length int) (string, error) {
+const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789"
+
+func GenerateRandomString(length int) string {
 	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+	for i := range bytes {
+		bytes[i] = letters[rand.Intn(len(letters))]
 	}
 
-	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+	return string(bytes)
 }
