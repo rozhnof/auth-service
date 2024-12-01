@@ -21,16 +21,25 @@ type Outbox struct {
 }
 
 type RefreshToken struct {
-	ID           uuid.UUID
-	UserID       uuid.UUID
-	RefreshToken string
-	ExpiredAt    time.Time
-	DeletedAt    *time.Time
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Token     string
+	ExpiredAt time.Time
+	DeletedAt *time.Time
+}
+
+type RegisterToken struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Token     string
+	ExpiredAt time.Time
+	DeletedAt *time.Time
 }
 
 type User struct {
 	ID           uuid.UUID
 	Email        string
+	Confirmed    bool
 	HashPassword string
 	DeletedAt    *time.Time
 }
