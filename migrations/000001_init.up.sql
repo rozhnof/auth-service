@@ -31,7 +31,3 @@ CREATE TABLE outbox (
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP NULL
 );
-
-
-CREATE UNIQUE INDEX idx_users_email ON users (email); 
-CREATE INDEX idx_refresh_token_user_id ON refresh_token (user_id); 
