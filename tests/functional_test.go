@@ -110,16 +110,16 @@ func TestLogin(t *testing.T) {
 		otherPassword = "other-test-password"
 	)
 
-	t.Run("login non existent user should return not found", func(t *testing.T) {
-		request := RegisterRequest{
+	t.Run("login non existent user should return nil response and status ok", func(t *testing.T) {
+		request := LoginRequest{
 			Email:    email,
 			Password: password,
 		}
 
-		response, statusCode := authServiceClient.Register(request)
+		response, statusCode := authServiceClient.Login(request)
 
 		require.Nil(t, response)
-		assert.Equal(t, http.StatusNotFound, statusCode)
+		assert.Equal(t, http.StatusOK, statusCode)
 	})
 
 	t.Run("register and login should return status ok", func(t *testing.T) {
