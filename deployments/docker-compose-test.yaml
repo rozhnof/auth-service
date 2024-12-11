@@ -65,3 +65,12 @@ services:
     restart: unless-stopped
     tty: true
     stdin_open: true
+
+  kafka:
+    image: confluentinc/confluent-local:latest
+    hostname: kafka
+    container_name: kafka
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29091
+      KAFKA_CONTROLLER_QUORUM_VOTERS:  1@kafka:29092 
+      KAFKA_LISTENERS:  PLAINTEXT://kafka:29091,CONTROLLER://kafka:29092

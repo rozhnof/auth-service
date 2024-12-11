@@ -16,3 +16,7 @@ tracing:
 
 cache:
   referral_code_ttl: 24h
+
+kafka:
+  brokers:
+    - kafka:29091
