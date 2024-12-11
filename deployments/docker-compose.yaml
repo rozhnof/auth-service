@@ -2,7 +2,7 @@ services:
   app:
     build:
       context: ../
-      dockerfile: build/docker/Dockerfile.auth
+      dockerfile: build/docker/Dockerfile
     depends_on:
       postgres:
         condition: service_healthy
