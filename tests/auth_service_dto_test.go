@@ -1,9 +1,6 @@
 package tests
 
-type QueryParams struct {
-	Key   string
-	Value string
-}
+import "github.com/google/uuid"
 
 type RegisterRequest struct {
 	Email    string `json:"email"`
@@ -11,8 +8,8 @@ type RegisterRequest struct {
 }
 
 type RegisterResponse struct {
-	Email  string `json:"email"`
-	UserID string `json:"user_id"`
+	Email  string    `json:"email"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 type LoginRequest struct {

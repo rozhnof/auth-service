@@ -1,246 +1,206 @@
 package tests
 
 import (
-	"context"
-	"log"
 	"net/http"
 	"testing"
 
-	"github.com/rozhnof/auth-service/internal/infrastructure/database/postgres"
-	"github.com/rozhnof/auth-service/internal/pkg/config"
 	"github.com/stretchr/testify/require"
 	"gotest.tools/assert"
 )
 
-const (
-	testConfigPath = "../config/test-config.yaml"
-	baseURL        = "http://localhost:9090"
-)
-
-var db postgres.Database
-
-func init() {
-	cfg, err := config.NewConfig[config.Postgres](testConfigPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	postgresCfg := postgres.DatabaseConfig{
-		Address:  cfg.Address,
-		Port:     cfg.Port,
-		User:     cfg.User,
-		Password: cfg.Password,
-		DB:       cfg.DB,
-		SSL:      cfg.SSL,
-	}
-
-	database, err := postgres.NewDatabase(context.Background(), postgresCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	db = database
+type Tokens struct {
+	Access  string
+	Refresh string
 }
 
-func Test1(t *testing.T) {
-	if err := truncateAllTables(); err != nil {
+func RequireRegister(t *testing.T, email string, password string) Tokens {
+	request := RegisterRequest{
+		Email:    email,
+		Password: password,
+	}
+
+	response, statusCode := authServiceClient.Register(request)
+
+	require.NotNil(t, response)
+	assert.Equal(t, http.StatusOK, statusCode)
+
+	return AssertLoginSuccess(t, email, password)
+}
+
+func AssertLoginSuccess(t *testing.T, email string, password string) Tokens {
+	request := LoginRequest{
+		Email:    email,
+		Password: password,
+	}
+
+	response, statusCode := authServiceClient.Login(request)
+
+	require.NotNil(t, response)
+	assert.Equal(t, http.StatusOK, statusCode)
+
+	return Tokens{
+		Access:  response.AccessToken,
+		Refresh: response.RefreshToken,
+	}
+}
+
+func TestRegister(t *testing.T) {
+	if err := SetUp(); err != nil {
 		t.Fatal(err)
 	}
 
-	t.Run("first register", func(t *testing.T) {
+	request := RegisterRequest{
+		Email:    "test.email@gmail.com",
+		Password: "test-password",
+	}
+
+	response, statusCode := authServiceClient.Register(request)
+
+	require.NotNil(t, response)
+	assert.Equal(t, http.StatusOK, statusCode)
+	AssertLoginSuccess(t, request.Email, request.Password)
+}
+
+func TestSecondRegister(t *testing.T) {
+	if err := SetUp(); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		email         = "test.email@gmail.com"
+		password      = "test-password"
+		otherPassword = "other-test-password"
+	)
+
+	RequireRegister(t, email, password)
+
+	t.Run("should return status conflict", func(t *testing.T) {
 		request := RegisterRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
+			Email:    email,
+			Password: password,
 		}
 
-		response, statusCode, err := Register(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		require.NotNil(t, response)
-		assert.Equal(t, http.StatusOK, statusCode)
-	})
-
-	t.Run("second register", func(t *testing.T) {
-		request := RegisterRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
-		}
-
-		response, statusCode, err := Register(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		response, statusCode := authServiceClient.Register(request)
 
 		require.Nil(t, response)
 		assert.Equal(t, http.StatusConflict, statusCode)
 	})
 
-	t.Run("third register with other password", func(t *testing.T) {
+	t.Run("should return status conflict", func(t *testing.T) {
 		request := RegisterRequest{
-			Email:    "test.email@gmail.com",
-			Password: "other-test-password",
+			Email:    email,
+			Password: otherPassword,
 		}
 
-		response, statusCode, err := Register(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		response, statusCode := authServiceClient.Register(request)
 
 		require.Nil(t, response)
 		assert.Equal(t, http.StatusConflict, statusCode)
 	})
 }
 
-func Test2(t *testing.T) {
-	if err := truncateAllTables(); err != nil {
+func TestLogin(t *testing.T) {
+	if err := SetUp(); err != nil {
 		t.Fatal(err)
 	}
 
-	t.Run("register", func(t *testing.T) {
+	var (
+		email         = "test.email@gmail.com"
+		password      = "test-password"
+		otherPassword = "other-test-password"
+	)
+
+	t.Run("login non existent user should return not found", func(t *testing.T) {
 		request := RegisterRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
+			Email:    email,
+			Password: password,
 		}
 
-		response, statusCode, err := Register(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		response, statusCode := authServiceClient.Register(request)
 
-		require.NotNil(t, response)
-		assert.Equal(t, http.StatusOK, statusCode)
+		require.Nil(t, response)
+		assert.Equal(t, http.StatusNotFound, statusCode)
 	})
 
-	t.Run("login", func(t *testing.T) {
+	t.Run("register and login should return status ok", func(t *testing.T) {
+		RequireRegister(t, email, password)
+	})
+
+	t.Run("login with other password should return nil response and status ok", func(t *testing.T) {
 		request := LoginRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
+			Email:    email,
+			Password: otherPassword,
 		}
 
-		response, statusCode, err := Login(request)
-		if err != nil {
-			t.Fatal(err)
+		response, statusCode := authServiceClient.Login(request)
+
+		require.Nil(t, response)
+		assert.Equal(t, http.StatusOK, statusCode)
+	})
+}
+
+func TestResfresh(t *testing.T) {
+	if err := SetUp(); err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		email    = "test.email@gmail.com"
+		password = "test-password"
+	)
+
+	tokens := RequireRegister(t, email, password)
+
+	t.Run("refresh with valid token should return new tokens and status ok", func(t *testing.T) {
+		request := RefreshRequest{
+			RefreshToken: tokens.Refresh,
 		}
+
+		response, statusCode := authServiceClient.Refresh(request)
+
+		require.NotNil(t, response)
+		assert.Equal(t, http.StatusOK, statusCode)
+
+		tokens.Access = response.AccessToken
+		tokens.Refresh = response.RefreshToken
+	})
+
+	t.Run("second refresh with returned token should return new tokens and status ok", func(t *testing.T) {
+		request := RefreshRequest{
+			RefreshToken: tokens.Refresh,
+		}
+
+		response, statusCode := authServiceClient.Refresh(request)
 
 		require.NotNil(t, response)
 		assert.Equal(t, http.StatusOK, statusCode)
 	})
+}
 
-	t.Run("update tokens with empty token", func(t *testing.T) {
+func TestResfreshWithInvalidToken(t *testing.T) {
+	if err := SetUp(); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("refresh with empty token", func(t *testing.T) {
 		request := RefreshRequest{
 			RefreshToken: "",
 		}
 
-		response, statusCode, err := Refresh(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		response, statusCode := authServiceClient.Refresh(request)
 
 		require.Nil(t, response)
 		assert.Equal(t, http.StatusBadRequest, statusCode)
 	})
 
-	t.Run("update tokens with empty token", func(t *testing.T) {
+	t.Run("refresh with invalid token", func(t *testing.T) {
 		request := RefreshRequest{
 			RefreshToken: "invalid-refresh-token",
 		}
 
-		response, statusCode, err := Refresh(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		response, statusCode := authServiceClient.Refresh(request)
 
 		require.Nil(t, response)
 		assert.Equal(t, http.StatusUnauthorized, statusCode)
 	})
-}
-
-func Test3(t *testing.T) {
-	if err := truncateAllTables(); err != nil {
-		t.Fatal(err)
-	}
-
-	t.Run("register", func(t *testing.T) {
-		request := RegisterRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
-		}
-
-		response, statusCode, err := Register(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		require.NotNil(t, response)
-		assert.Equal(t, http.StatusOK, statusCode)
-	})
-
-	var refreshToken1 string
-
-	t.Run("login", func(t *testing.T) {
-		request := LoginRequest{
-			Email:    "test.email@gmail.com",
-			Password: "test-password",
-		}
-
-		response, statusCode, err := Login(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		require.NotNil(t, response)
-		assert.Equal(t, http.StatusOK, statusCode)
-
-		refreshToken1 = response.RefreshToken
-	})
-
-	t.Run("refresh token 1", func(t *testing.T) {
-		request := RefreshRequest{
-			RefreshToken: refreshToken1,
-		}
-
-		response, statusCode, err := Refresh(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		require.NotNil(t, response)
-		assert.Equal(t, http.StatusOK, statusCode)
-	})
-
-	t.Run("refresh token 1 again", func(t *testing.T) {
-		request := RefreshRequest{
-			RefreshToken: refreshToken1,
-		}
-
-		response, statusCode, err := Refresh(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		require.Nil(t, response)
-		assert.Equal(t, http.StatusUnauthorized, statusCode)
-	})
-}
-
-func truncateAllTables() error {
-	query := `
-		DO $$ DECLARE
-			table_name TEXT;
-		BEGIN
-			FOR table_name IN 
-				SELECT tablename 
-				FROM pg_tables 
-				WHERE schemaname = 'public'
-			LOOP
-				EXECUTE format('TRUNCATE TABLE %I CASCADE', table_name);
-			END LOOP;
-		END $$;
-	`
-
-	_, err := db.Exec(context.Background(), query)
-
-	return err
 }
