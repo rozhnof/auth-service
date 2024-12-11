@@ -116,12 +116,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	at, rt, err := h.authService.Login(ctx, request.Email, request.Password)
 	if err != nil {
-		if errors.Is(err, repo.ErrObjectNotFound) {
-			c.String(http.StatusNotFound, err.Error())
-			return
-		}
-
-		if errors.Is(err, services.ErrInvalidPassword) {
+		if errors.Is(err, repo.ErrObjectNotFound) || errors.Is(err, services.ErrInvalidPassword) {
 			c.String(http.StatusOK, "invalid email or password")
 			return
 		}
