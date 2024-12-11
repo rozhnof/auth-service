@@ -31,8 +31,16 @@ const (
 	OutboxInterval  = time.Second * 30
 )
 
+const (
+	loginsTopic    = "logins"
+	registersTopic = "registers"
+)
+
 var (
-	topics = []string{"logins", "registers"}
+	topics = []string{
+		loginsTopic,
+		registersTopic,
+	}
 )
 
 type Config struct {
@@ -76,8 +84,8 @@ func NewApp(
 	)
 
 	var (
-		loginMessageSender    = NewMessageSender[services.LoginMessage](outboxSender, "logins")
-		registerMessageSender = NewMessageSender[services.RegisterMessage](outboxSender, "registers")
+		loginMessageSender    = NewMessageSender[services.LoginMessage](outboxSender, loginsTopic)
+		registerMessageSender = NewMessageSender[services.RegisterMessage](outboxSender, registersTopic)
 	)
 
 	var (
