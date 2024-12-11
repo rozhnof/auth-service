@@ -7,16 +7,22 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func InitRoutes(router gin.IRoutes, authHandler *handlers.AuthHandler, googleAuthHandler *handlers.GoogleAuthHandler) {
-	router.POST("/auth/register", authHandler.Register)
-	router.POST("/auth/login", authHandler.Login)
-	router.POST("/auth/refresh", authHandler.Refresh)
-	router.GET("/auth/confirm", authHandler.Confirm)
+func InitAuthRoutes(router gin.IRouter, authHandler *handlers.AuthHandler, googleAuthHandler *handlers.GoogleAuthHandler) {
+	authGroup := router.Group("/auth")
+	{
+		authGroup.POST("/register", authHandler.Register)
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
+		authGroup.GET("/confirm", authHandler.Confirm)
 
-	router.GET("/auth/google/login", googleAuthHandler.Login)
-	router.GET("/auth/google/callback", googleAuthHandler.Callback)
+		googleAuthGroup := router.Group("/google")
+		{
+			googleAuthGroup.GET("/login", googleAuthHandler.Login)
+			googleAuthGroup.GET("/callback", googleAuthHandler.Callback)
+		}
+	}
 }
 
-func InitSwagger(router gin.IRoutes) {
+func InitSwaggerRoutes(router gin.IRoutes) {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

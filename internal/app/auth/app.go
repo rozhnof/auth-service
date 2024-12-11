@@ -125,8 +125,8 @@ func NewApp(
 		LogMiddleware(logger),
 	)
 
-	InitRoutes(router, authHandler, googleAuthHandler)
-	InitSwagger(router)
+	InitAuthRoutes(router, authHandler, googleAuthHandler)
+	InitSwaggerRoutes(router)
 
 	httpServer := server.NewHTTPServer(ctx, cfg.Server.Address, router)
 
