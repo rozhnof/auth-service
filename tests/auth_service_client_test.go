@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 )
 
 type AuthServiceClient struct {
@@ -37,24 +38,22 @@ func makeRequest[Req any, Resp any](client *http.Client, baseURL string, endpoin
 	url := fmt.Sprintf("%s%s", baseURL, endpoint)
 
 	var body io.Reader
-
 	if request != nil {
 		requestBytes, err := json.Marshal(request)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("failed to marshal request: %v", err)
 		}
-
 		body = bytes.NewBuffer(requestBytes)
 	}
 
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to create HTTP request: %v", err)
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to send HTTP request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -62,15 +61,19 @@ func makeRequest[Req any, Resp any](client *http.Client, baseURL string, endpoin
 		return nil, resp.StatusCode
 	}
 
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "application/json") {
+		return nil, resp.StatusCode
+	}
+
 	responseBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to read response body: %v", err)
 	}
 
 	var response Resp
-
 	if err := json.Unmarshal(responseBytes, &response); err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to unmarshal response: %v", err)
 	}
 
 	return &response, resp.StatusCode
