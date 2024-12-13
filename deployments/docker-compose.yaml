@@ -152,6 +152,45 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: LISTNER_INT
       ZOOKEEPER: zookeeper:2181
 
+  logstash:
+    image: elastic/logstash:7.17.25
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - "../logs:/var/log:ro"
+      - ../config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - 5044:5044
+
+  elasticsearch:
+    image: elastic/elasticsearch:7.17.25
+    environment:
+      - discovery.type=single-node
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:9200/_cat/health"]
+      interval: 3s
+      timeout: 30s
+      retries: 5
+    volumes:
+      - elastic-data:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+
+  kibana:
+    image: elastic/kibana:7.17.25
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/api/status"]
+      interval: 3s
+      timeout: 30s
+      retries: 5
+    ports:
+      - 5601:5601
+
 volumes:
   postgres-data:
   redis-data:
+  elastic-data:
