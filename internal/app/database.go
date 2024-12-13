@@ -23,12 +23,11 @@ func NewPostgresDatabase(ctx context.Context, cfg config.Postgres) (postgres.Dat
 
 func NewRedisDatabase(ctx context.Context, cfg config.Redis) (redis.Database, error) {
 	redisConfig := redis.DatabaseConfig{
-		Address:      cfg.Address,
-		Port:         cfg.Port,
-		User:         cfg.User,
-		Password:     cfg.Password,
-		UserPassword: cfg.UserPassword,
-		DB:           cfg.DB,
+		Address:  cfg.Address,
+		Port:     cfg.Port,
+		User:     cfg.User,
+		Password: cfg.Password,
+		DB:       cfg.DB,
 	}
 
 	return redis.NewDatabase(ctx, redisConfig)

@@ -9,12 +9,11 @@ import (
 )
 
 type DatabaseConfig struct {
-	Address      string
-	Port         int
-	User         string
-	Password     string
-	UserPassword string
-	DB           int
+	Address  string
+	Port     int
+	User     string
+	Password string
+	DB       int
 }
 
 type Database struct {
@@ -25,7 +24,7 @@ func NewDatabase(ctx context.Context, cfg DatabaseConfig) (Database, error) {
 	options := &redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", cfg.Address, cfg.Port),
 		Username: cfg.User,
-		Password: cfg.UserPassword,
+		Password: cfg.Password,
 		DB:       cfg.DB,
 	}
 
