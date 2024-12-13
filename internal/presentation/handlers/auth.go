@@ -28,7 +28,7 @@ func NewAuthHandler(service *services.AuthService, log *slog.Logger, tracer trac
 // Confirm godoc
 // @Summary Confirm user registration
 // @Description This endpoint confirms user registration using the provided email and register_token.
-// @Tags Authentication
+// @Tags Auth
 // @Accept json
 // @Produce json
 // @Param email query string true "User email"

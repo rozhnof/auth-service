@@ -30,7 +30,7 @@ func NewGoogleAuthHandler(cfg oauth2.Config, service *services.AuthService, log 
 
 // @Summary Google OAuth Login
 // @Description Redirects to Google OAuth login page.
-// @Tags auth
+// @Tags Auth
 // @Success 303 {object} string "Redirecting to Google OAuth"
 // @Router /auth/google/login [get]
 func (h *GoogleAuthHandler) Login(c *gin.Context) {
