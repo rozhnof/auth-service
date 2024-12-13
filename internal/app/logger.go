@@ -26,7 +26,7 @@ func NewLogger(cfg config.Logger) (*slog.Logger, error) {
 	var logOutput io.Writer
 
 	if cfg.Path != "" {
-		logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_SYNC, 0644)
+		logFile, err := os.OpenFile(cfg.Path, os.O_RDWR|os.O_SYNC|os.O_APPEND, 0644)
 		if err != nil {
 			return nil, err
 		}
