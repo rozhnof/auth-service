@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rozhnof/auth-service/internal/application/services"
 	"github.com/rozhnof/auth-service/internal/infrastructure/database/postgres"
 	"github.com/rozhnof/auth-service/internal/infrastructure/database/redis"
@@ -131,10 +132,15 @@ func NewApp(
 		gin.Recovery(),
 		otelgin.Middleware(ServiceName),
 		LogMiddleware(logger),
+		PrometheusMiddleware(),
 	)
+
+	prometheus.MustRegister(RequestCount)
+	prometheus.MustRegister(ErrorRequestCount)
 
 	InitAuthRoutes(router, authHandler, googleAuthHandler)
 	InitSwaggerRoutes(router)
+	InitPrometheusRoutes(router)
 
 	httpServer := server.NewHTTPServer(ctx, cfg.Server.Address, router)
 

@@ -11,6 +11,9 @@ services:
     ports:
       - "8080:8080" 
     env_file: ".env"
+    volumes:
+      - ../config:/app/config
+      - ../logs:/app/logs
 
   postgres:
     image: postgres:13
@@ -223,7 +226,7 @@ services:
       - GF_SECURITY_ENABLE_BASIC_AUTH=false
       - GF_SECURITY_DISABLE_LOGIN_FORM=true
     volumes:
-      - ../grafana:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
     ports:
@@ -233,3 +236,4 @@ volumes:
   postgres-data:
   redis-data:
   elastic-data:
+  grafana-data:

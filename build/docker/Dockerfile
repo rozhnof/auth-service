@@ -15,6 +15,5 @@ FROM alpine:3 AS app
 WORKDIR /app
 
 COPY --from=builder /app/auth-service /app/auth-service
-COPY --from=builder /app/config /app/config
 
 CMD ["/app/auth-service"]

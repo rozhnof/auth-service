@@ -2,6 +2,7 @@ package auth
 
 import (
 	"log/slog"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,6 +36,21 @@ func LogMiddleware(log *slog.Logger) gin.HandlerFunc {
 				slog.String("address", c.Request.RemoteAddr),
 				slog.String("duration", duration.String()),
 			)
+		}
+	}
+}
+
+func PrometheusMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		c.Next()
+
+		status := c.Writer.Status()
+
+		RequestCount.WithLabelValues(path, http.StatusText(status)).Inc()
+		if status >= 400 {
+			ErrorRequestCount.WithLabelValues(path, http.StatusText(status)).Inc()
 		}
 	}
 }
