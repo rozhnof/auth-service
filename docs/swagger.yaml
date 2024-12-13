@@ -54,6 +54,37 @@ info:
   title: Authentication Service API
   version: "1.0"
 paths:
+  /auth/confirm:
+    post:
+      consumes:
+      - application/json
+      description: This endpoint confirms user registration using the provided email
+        and register_token.
+      parameters:
+      - description: User email
+        in: query
+        name: email
+        required: true
+        type: string
+      - description: Register token
+        in: query
+        name: register_token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Confirm user registration
+      tags:
+      - Auth
   /auth/google/login:
     get:
       description: Redirects to Google OAuth login page.
@@ -64,7 +95,7 @@ paths:
             type: string
       summary: Google OAuth Login
       tags:
-      - auth
+      - Auth
   /auth/login:
     post:
       consumes:
@@ -170,14 +201,4 @@ securityDefinitions:
     in: header
     name: Authorization
     type: apiKey
-  OAuth2:
-    authorizationUrl: https://accounts.google.com/o/oauth2/auth
-    description: OAuth2 Authorization Code Flow for Google authentication
-    flow: accessCode
-    scopes:
-      email: Grants access to the user's email address
-      openid: Grants access to the user's basic profile information
-      profile: Grants access to the user's profile
-    tokenUrl: https://oauth2.googleapis.com/token
-    type: oauth2
 swagger: "2.0"

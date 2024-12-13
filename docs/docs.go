@@ -15,11 +15,56 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/auth/confirm": {
+            "post": {
+                "description": "This endpoint confirms user registration using the provided email and register_token.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Confirm user registration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Register token",
+                        "name": "register_token",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/google/login": {
             "get": {
                 "description": "Redirects to Google OAuth login page.",
                 "tags": [
-                    "auth"
+                    "Auth"
                 ],
                 "summary": "Google OAuth Login",
                 "responses": {
@@ -268,18 +313,6 @@ const docTemplate = `{
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
-        },
-        "OAuth2": {
-            "description": "OAuth2 Authorization Code Flow for Google authentication",
-            "type": "oauth2",
-            "flow": "accessCode",
-            "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
-            "tokenUrl": "https://oauth2.googleapis.com/token",
-            "scopes": {
-                "email": "Grants access to the user's email address",
-                "openid": "Grants access to the user's basic profile information",
-                "profile": "Grants access to the user's profile"
-            }
         }
     }
 }`
