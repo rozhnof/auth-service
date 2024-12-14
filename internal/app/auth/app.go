@@ -135,8 +135,8 @@ func NewApp(
 		PrometheusMiddleware(),
 	)
 
-	prometheus.MustRegister(RequestCount)
-	prometheus.MustRegister(ErrorRequestCount)
+	prometheus.MustRegister(requestCount)
+	prometheus.MustRegister(errorRequestCount)
 
 	InitAuthRoutes(router, authHandler, googleAuthHandler)
 	InitSwaggerRoutes(router)

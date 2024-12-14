@@ -5,19 +5,19 @@ import (
 )
 
 var (
-	RequestCount = prometheus.NewCounterVec(
+	requestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "auth_service_requests_total",
 			Help: "Total number of requests processed by the Auth Service.",
 		},
-		[]string{"path", "status"},
+		[]string{"path", "method", "status"},
 	)
 
-	ErrorRequestCount = prometheus.NewCounterVec(
+	errorRequestCount = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "auth_service_errors_requests_total",
 			Help: "Total number of error requests processed by the Auth Service.",
 		},
-		[]string{"path", "status"},
+		[]string{"path", "method", "status"},
 	)
 )
