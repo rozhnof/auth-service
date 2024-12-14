@@ -8,6 +8,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      kafka1:
+        condition: service_healthy
+      kafka2:
+        condition: service_healthy
+      kafka3:
+        condition: service_healthy
     ports:
       - "8080:8080" 
     env_file: ".env"
@@ -93,7 +99,10 @@ services:
   kafka1:
     image: confluentinc/cp-kafka:latest
     healthcheck:
-      test: ps augwwx | egrep [S]upportedKafka
+      test: nc -z localhost 9091 || exit -1
+      interval: 3s
+      timeout: 30s
+      retries: 5
     depends_on:
       - zookeeper
     ports:
@@ -110,7 +119,10 @@ services:
   kafka2:
     image: confluentinc/cp-kafka:latest
     healthcheck:
-      test: ps augwwx | egrep [S]upportedKafka
+      test: nc -z localhost 9092 || exit -1
+      interval: 3s
+      timeout: 30s
+      retries: 5
     depends_on:
       - zookeeper
     ports:
@@ -127,7 +139,10 @@ services:
   kafka3:
     image: confluentinc/cp-kafka:latest
     healthcheck:
-      test: ps augwwx | egrep [S]upportedKafka
+      test: nc -z localhost 9093 || exit -1
+      interval: 3s
+      timeout: 30s
+      retries: 5
     depends_on:
       - zookeeper
     ports:
@@ -159,8 +174,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-s", "-f", "http://localhost:9200/_cat/health"]
       interval: 3s
-      timeout: 30s
-      retries: 5
+      timeout: 10s
+      retries: 10
     volumes:
       - elastic-data:/usr/share/elasticsearch/data
     ports:
