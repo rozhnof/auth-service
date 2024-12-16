@@ -132,11 +132,12 @@ func NewApp(
 		gin.Recovery(),
 		otelgin.Middleware(ServiceName),
 		LogMiddleware(logger),
-		PrometheusMiddleware(),
+		PrometheusMiddleware(ServiceName),
 	)
 
-	prometheus.MustRegister(requestCount)
-	prometheus.MustRegister(errorRequestCount)
+	prometheus.MustRegister(totalRequests)
+	prometheus.MustRegister(responseStatus)
+	prometheus.MustRegister(httpDuration)
 
 	InitAuthRoutes(router, authHandler, googleAuthHandler)
 	InitSwaggerRoutes(router)

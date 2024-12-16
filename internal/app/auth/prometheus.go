@@ -5,19 +5,24 @@ import (
 )
 
 var (
-	requestCount = prometheus.NewCounterVec(
+	totalRequests = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_service_requests_total",
-			Help: "Total number of requests processed by the Auth Service.",
+			Name: "http_requests_total",
+			Help: "Total number of requests.",
 		},
-		[]string{"path", "method", "status"},
+		[]string{"service", "path"},
 	)
 
-	errorRequestCount = prometheus.NewCounterVec(
+	responseStatus = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "auth_service_errors_requests_total",
-			Help: "Total number of error requests processed by the Auth Service.",
+			Name: "http_response_status",
+			Help: "Status of HTTP response",
 		},
-		[]string{"path", "method", "status"},
+		[]string{"service", "status"},
 	)
+
+	httpDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "http_response_time_seconds",
+		Help: "Duration of HTTP requests.",
+	}, []string{"service", "path"})
 )

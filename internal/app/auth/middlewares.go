@@ -2,11 +2,11 @@ package auth
 
 import (
 	"log/slog"
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func LogMiddleware(log *slog.Logger) gin.HandlerFunc {
@@ -41,18 +41,19 @@ func LogMiddleware(log *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-func PrometheusMiddleware() gin.HandlerFunc {
+func PrometheusMiddleware(serviceName string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		method := c.Request.Method
+
+		timer := prometheus.NewTimer(httpDuration.WithLabelValues(serviceName, path))
 
 		c.Next()
 
+		timer.ObserveDuration()
+
 		status := c.Writer.Status()
 
-		requestCount.WithLabelValues(path, method, strconv.Itoa(status)).Inc()
-		if status >= http.StatusInternalServerError {
-			errorRequestCount.WithLabelValues(path, method, strconv.Itoa(status)).Inc()
-		}
+		responseStatus.WithLabelValues(serviceName, strconv.Itoa(status)).Inc()
+		totalRequests.WithLabelValues(serviceName, path).Inc()
 	}
 }
