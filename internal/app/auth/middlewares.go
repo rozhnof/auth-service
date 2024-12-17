@@ -53,7 +53,7 @@ func PrometheusMiddleware(serviceName string) gin.HandlerFunc {
 
 		status := c.Writer.Status()
 
-		responseStatus.WithLabelValues(serviceName, strconv.Itoa(status)).Inc()
+		responseStatus.WithLabelValues(serviceName, strconv.Itoa(status), path).Inc()
 		totalRequests.WithLabelValues(serviceName, path).Inc()
 	}
 }

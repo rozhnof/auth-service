@@ -18,7 +18,7 @@ var (
 			Name: "http_response_status",
 			Help: "Status of HTTP response",
 		},
-		[]string{"service", "status"},
+		[]string{"service", "status", "path"},
 	)
 
 	httpDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
