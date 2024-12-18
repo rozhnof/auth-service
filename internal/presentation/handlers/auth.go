@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	repo "github.com/rozhnof/auth-service/internal/application/repository"
 	"github.com/rozhnof/auth-service/internal/application/services"
+	"github.com/rozhnof/auth-service/internal/domain"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -46,6 +47,16 @@ func (h *AuthHandler) Confirm(c *gin.Context) {
 	)
 
 	if err := h.authService.Confirm(ctx, email, registerToken); err != nil {
+		if errors.Is(err, repo.ErrObjectNotFound) {
+			c.String(http.StatusNotFound, err.Error())
+			return
+		}
+
+		if errors.Is(err, domain.ErrInvalidRegisterToken) {
+			c.String(http.StatusUnauthorized, err.Error())
+			return
+		}
+
 		c.Status(http.StatusInternalServerError)
 		return
 	}

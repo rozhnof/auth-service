@@ -1,10 +1,11 @@
 package entities
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"github.com/rozhnof/auth-service/internal/domain"
 	vobjects "github.com/rozhnof/auth-service/internal/domain/value_objects"
 )
 
@@ -65,11 +66,11 @@ func (u *User) Confirmed() bool {
 
 func (u *User) Confirm() error {
 	if u.RegisterToken() == nil {
-		return errors.New("register token not exists")
+		return errors.Wrap(domain.ErrInvalidRegisterToken, "register token not exists")
 	}
 
 	if !u.RegisterToken().Valid() {
-		return errors.New("register token is invalid")
+		return errors.Wrap(domain.ErrInvalidRegisterToken, "register token is invalid")
 	}
 
 	u.confirmed = true
