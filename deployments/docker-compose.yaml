@@ -16,6 +16,7 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080" 
+      - "6060:6060" 
     env_file: ".env"
     volumes:
       - ../config:/app/config
@@ -32,6 +33,14 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/repository/data
+    env_file: ".env"
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter
+    ports:
+      - 9187:9187
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}"
     env_file: ".env"
 
   migrate:
