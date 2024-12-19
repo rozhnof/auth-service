@@ -2,9 +2,7 @@ package auth
 
 import (
 	"context"
-	"errors"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -154,7 +152,7 @@ func NewApp(
 	InitSwaggerRoutes(router)
 	InitPrometheusRoutes(router)
 
-	httpServer := server.NewHTTPServer(ctx, cfg.Server.Address, router)
+	httpServer := server.NewHTTPServer(ctx, cfg.Server.Address, router, logger)
 
 	return &App{
 		logger:     logger,
@@ -164,43 +162,9 @@ func NewApp(
 }
 
 func (a *App) Run(ctx context.Context) error {
-	go func() {
-		ticker := time.NewTicker(OutboxInterval)
+	if err := a.outbox.Run(ctx, topics, OutboxBatchSize, OutboxInterval); err != nil {
+		a.logger.Error("kafka reader error", slog.String("error", err.Error()))
+	}
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-
-			for _, topic := range topics {
-				if err := a.outbox.Read(ctx, topic, OutboxBatchSize); err != nil {
-					a.logger.Warn("failed read from postgres and send message to kafka", slog.String("error", err.Error()))
-				}
-			}
-		}
-	}()
-
-	errChan := make(chan error)
-
-	go func() {
-		if err := a.httpServer.Run(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			errChan <- err
-		} else {
-			errChan <- nil
-		}
-	}()
-
-	go func() {
-		<-ctx.Done()
-
-		if err := a.httpServer.Shutdown(); err != nil {
-			errChan <- err
-		} else {
-			errChan <- nil
-		}
-	}()
-
-	return errors.Join(<-errChan, <-errChan)
+	return a.httpServer.Run(ctx)
 }

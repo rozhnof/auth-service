@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	"github.com/rozhnof/auth-service/internal/infrastructure/kafka"
 	trm "github.com/rozhnof/auth-service/pkg/transaction_manager"
@@ -18,7 +19,7 @@ type KafkaOutboxSender struct {
 	repository *Repository
 	txManager  trm.TransactionManager
 	sender     MessageSender
-	log        *slog.Logger
+	logger     *slog.Logger
 	tracer     trace.Tracer
 }
 
@@ -27,7 +28,7 @@ func NewKafkaOutboxSender(txManager trm.TransactionManager, messageSender Messag
 		repository: NewRepository(txManager, log, tracer),
 		txManager:  txManager,
 		sender:     messageSender,
-		log:        log,
+		logger:     log,
 		tracer:     tracer,
 	}
 }
@@ -74,4 +75,25 @@ func (s *KafkaOutboxSender) Read(ctx context.Context, topic string, limit int32)
 	}
 
 	return nil
+}
+
+func (s *KafkaOutboxSender) Run(ctx context.Context, topics []string, batchSize int32, readInterval time.Duration) error {
+	ctx, span := s.tracer.Start(ctx, "OutboxMessageSender.Run")
+	defer span.End()
+
+	ticker := time.NewTicker(readInterval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+
+		for _, topic := range topics {
+			if err := s.Read(ctx, topic, batchSize); err != nil {
+				s.logger.Warn("failed read from postgres and send message to kafka", slog.String("error", err.Error()))
+			}
+		}
+	}
 }
