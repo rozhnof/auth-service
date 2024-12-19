@@ -8,15 +8,19 @@ import (
 	"os/signal"
 	"syscall"
 
+	_ "net/http/pprof"
+
 	_ "github.com/rozhnof/auth-service/docs"
 	"github.com/rozhnof/auth-service/internal/app"
 	"github.com/rozhnof/auth-service/internal/app/auth"
 	"github.com/rozhnof/auth-service/internal/infrastructure/kafka"
 	"github.com/rozhnof/auth-service/internal/pkg/config"
+	"github.com/rozhnof/auth-service/internal/pkg/server"
 )
 
 const (
 	EnvConfigPath = "CONFIG_PATH"
+	pprofAddress  = ":6060"
 )
 
 // @title           Authentication Service API
@@ -99,9 +103,22 @@ func main() {
 	)
 	logger.Info("init app success")
 
-	logger.Info("run app")
+	go func() {
+		logger.Info("start pprof server")
+
+		pprofServer := server.NewHTTPServer(ctx, pprofAddress, nil, logger)
+
+		if err := pprofServer.Run(ctx); err != nil {
+			logger.Error("pprof server error", slog.String("error", err.Error()))
+			return
+		}
+
+		logger.Info("shutdown pprof server")
+	}()
+
+	logger.Info("start app")
 	if err := authApp.Run(ctx); err != nil {
-		logger.Error("run app error", slog.String("error", err.Error()))
+		logger.Error("app error", slog.String("error", err.Error()))
 		return
 	}
 
