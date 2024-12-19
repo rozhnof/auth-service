@@ -1,27 +1,29 @@
 package handlers
 
 import (
-	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/rozhnof/auth-service/internal/application/services"
+	"github.com/rozhnof/auth-service/internal/presentation/clients"
 	"go.opentelemetry.io/otel/trace"
-	"golang.org/x/oauth2"
+)
+
+const (
+	todoState = "randomstate"
 )
 
 type GoogleAuthHandler struct {
+	authClient  *clients.GoogleAuthClient
 	log         *slog.Logger
 	authService *services.AuthService
 	tracer      trace.Tracer
-	cfg         oauth2.Config
 }
 
-func NewGoogleAuthHandler(cfg oauth2.Config, service *services.AuthService, log *slog.Logger, tracer trace.Tracer) *GoogleAuthHandler {
+func NewGoogleAuthHandler(authClient *clients.GoogleAuthClient, service *services.AuthService, log *slog.Logger, tracer trace.Tracer) *GoogleAuthHandler {
 	return &GoogleAuthHandler{
-		cfg:         cfg,
+		authClient:  authClient,
 		authService: service,
 		log:         log,
 		tracer:      tracer,
@@ -34,60 +36,53 @@ func NewGoogleAuthHandler(cfg oauth2.Config, service *services.AuthService, log 
 // @Success 303 {object} string "Redirecting to Google OAuth"
 // @Router /auth/google/login [get]
 func (h *GoogleAuthHandler) Login(c *gin.Context) {
-	authURL := h.cfg.AuthCodeURL("randomstate")
+	authURL := h.authClient.GetAuthURL(todoState)
 
 	c.Redirect(http.StatusSeeOther, authURL)
+}
+
+type callbackQueryParams struct {
+	State string `form:"state" binding:"required"`
+	Code  string `form:"code" binding:"required"`
 }
 
 func (h *GoogleAuthHandler) Callback(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "GoogleAuthHandler.Callback")
 	defer span.End()
 
-	state := c.Query("state")
-	if state != "randomstate" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "states don't match"})
+	var queryParams callbackQueryParams
+	if err := c.ShouldBindQuery(&queryParams); err != nil {
+		c.String(http.StatusBadRequest, err.Error())
 		return
 	}
 
-	code := c.Query("code")
-	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required parameter: code"})
+	if queryParams.State != todoState {
+		c.String(http.StatusBadRequest, "states don't match")
 		return
 	}
 
-	token, err := h.cfg.Exchange(ctx, code)
+	token, err := h.authClient.ExchangeOAuthToken(ctx, queryParams.Code)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not exchange code for token"})
+		c.String(http.StatusInternalServerError, "could not exchange code for token")
 		return
 	}
 
-	resp, err := http.Get("https://www.googleapis.com/oauth2/v2/userinfo?access_token=" + token.AccessToken)
+	userInfo, statusCode, err := h.authClient.GetUserInfo(token.AccessToken)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not get user info"})
-		return
-	}
-	defer resp.Body.Close()
+		h.log.Warn("failed get user info", slog.String("error", err.Error()))
 
-	if resp.StatusCode != http.StatusOK {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch user data"})
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
-	userDataBytes, err := io.ReadAll(resp.Body)
+	if statusCode < 200 || statusCode >= 400 {
+		c.Status(statusCode)
+		return
+	}
+
+	user, err := h.authService.OAuthLogin(ctx, userInfo.Email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not read user data"})
-		return
-	}
-
-	var userData GoogleUserData
-	if err := json.Unmarshal(userDataBytes, &userData); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unmarshal user data"})
-		return
-	}
-
-	user, err := h.authService.OAuthLogin(ctx, userData.Email)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to authenticate user"})
+		c.String(http.StatusInternalServerError, "failed to authenticate user")
 		return
 	}
 

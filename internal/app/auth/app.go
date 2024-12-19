@@ -17,6 +17,7 @@ import (
 	"github.com/rozhnof/auth-service/internal/infrastructure/secrets"
 	"github.com/rozhnof/auth-service/internal/pkg/config"
 	"github.com/rozhnof/auth-service/internal/pkg/server"
+	"github.com/rozhnof/auth-service/internal/presentation/clients"
 	"github.com/rozhnof/auth-service/internal/presentation/handlers"
 	"github.com/rozhnof/auth-service/pkg/outbox"
 	trm "github.com/rozhnof/auth-service/pkg/transaction_manager"
@@ -35,6 +36,16 @@ const (
 const (
 	loginsTopic    = "logins"
 	registersTopic = "registers"
+)
+
+const (
+	googleCallbackURL = "http://localhost:8080/auth/google/callback"
+)
+
+var (
+	googleOAuthScopes = []string{
+		"https://www.googleapis.com/auth/userinfo.email",
+	}
 )
 
 var (
@@ -108,18 +119,18 @@ func NewApp(
 	)
 
 	googleAuthHandlerConfig := oauth2.Config{
-		RedirectURL:  "http://localhost:8080/auth/google/callback",
+		RedirectURL:  googleCallbackURL,
 		ClientID:     string(secretManager.GoogleClientID().Get()),
 		ClientSecret: string(secretManager.GoogleClientSecret().Get()),
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-		},
-		Endpoint: google.Endpoint,
+		Scopes:       googleOAuthScopes,
+		Endpoint:     google.Endpoint,
 	}
+
+	googleAuthClient := clients.NewGoogleAuthClient(googleAuthHandlerConfig)
 
 	var (
 		authHandler       = handlers.NewAuthHandler(authService, logger, tracer)
-		googleAuthHandler = handlers.NewGoogleAuthHandler(googleAuthHandlerConfig, authService, logger, tracer)
+		googleAuthHandler = handlers.NewGoogleAuthHandler(googleAuthClient, authService, logger, tracer)
 	)
 
 	gin.SetMode(cfg.Mode)
