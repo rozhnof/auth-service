@@ -41,12 +41,13 @@ func (h *AuthHandler) Confirm(c *gin.Context) {
 	ctx, span := h.tracer.Start(c.Request.Context(), "AuthHandler.Confirm")
 	defer span.End()
 
-	var (
-		email         = c.Query("email")
-		registerToken = c.Query("register_token")
-	)
+	var queryParams ConfirmQueryParams
+	if err := c.ShouldBindQuery(&queryParams); err != nil {
+		c.String(http.StatusBadRequest, "missing required query parameters")
+		return
+	}
 
-	if err := h.authService.Confirm(ctx, email, registerToken); err != nil {
+	if err := h.authService.Confirm(ctx, queryParams.Email, queryParams.RegisterToken); err != nil {
 		if errors.Is(err, repo.ErrObjectNotFound) {
 			c.String(http.StatusNotFound, err.Error())
 			return

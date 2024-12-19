@@ -32,3 +32,8 @@ type RefreshResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
+
+type ConfirmQueryParams struct {
+	Email         string `form:"email" binding:"required"`
+	RegisterToken string `form:"register_token" binding:"required"`
+}
