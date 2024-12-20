@@ -162,9 +162,11 @@ func NewApp(
 }
 
 func (a *App) Run(ctx context.Context) error {
-	if err := a.outbox.Run(ctx, topics, OutboxBatchSize, OutboxInterval); err != nil {
-		a.logger.Error("kafka reader error", slog.String("error", err.Error()))
-	}
+	go func() {
+		if err := a.outbox.Run(ctx, topics, OutboxBatchSize, OutboxInterval); err != nil {
+			a.logger.Error("kafka reader error", slog.String("error", err.Error()))
+		}
+	}()
 
 	return a.httpServer.Run(ctx)
 }
