@@ -50,7 +50,8 @@ services:
     image: migrate/migrate:4
     command: -path=../migrations/ -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}" up
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - ../migrations:/migrations:ro
     env_file: ".env"
