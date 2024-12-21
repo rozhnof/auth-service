@@ -20,7 +20,10 @@ services:
     env_file: ".env"
     volumes:
       - ../config:/app/config
-      - ../logs:/app/logs
+    logging:
+      driver: "gelf"
+      options:
+        gelf-address: "udp://127.0.0.1:5044"
 
   postgres:
     image: postgres:13
@@ -47,8 +50,7 @@ services:
     image: migrate/migrate:4
     command: -path=../migrations/ -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=${POSTGRES_SSLMODE}" up
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
     volumes:
       - ../migrations:/migrations:ro
     env_file: ".env"
@@ -110,8 +112,8 @@ services:
     healthcheck:
       test: nc -z localhost 9091 || exit -1
       interval: 3s
-      timeout: 30s
-      retries: 5
+      timeout: 10s
+      retries: 10
     depends_on:
       - zookeeper
     ports:
@@ -130,8 +132,8 @@ services:
     healthcheck:
       test: nc -z localhost 9092 || exit -1
       interval: 3s
-      timeout: 30s
-      retries: 5
+      timeout: 10s
+      retries: 10
     depends_on:
       - zookeeper
     ports:
@@ -150,8 +152,8 @@ services:
     healthcheck:
       test: nc -z localhost 9093 || exit -1
       interval: 3s
-      timeout: 30s
-      retries: 5
+      timeout: 10s
+      retries: 10
     depends_on:
       - zookeeper
     ports:
@@ -168,13 +170,16 @@ services:
   logstash:
     image: elastic/logstash:7.17.25
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - elasticsearch
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/_node/pipelines"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
     volumes:
-      - "../logs:/var/log:ro"
       - ../config/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     ports:
-      - 5044:5044
+      - "5044:5044/udp"
 
   elasticsearch:
     image: elastic/elasticsearch:7.17.25
@@ -193,8 +198,7 @@ services:
   kibana:
     image: elastic/kibana:7.17.25
     depends_on:
-      elasticsearch:
-        condition: service_healthy
+      - elasticsearch
     healthcheck:
       test: ["CMD", "curl", "-s", "-f", "http://localhost:5601/api/status"]
       interval: 3s

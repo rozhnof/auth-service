@@ -5,7 +5,7 @@ server:
 
 logging:
   level: info
-  path: ./logs/auth-service.log
+  # path: ./logs/auth-service.log
 
 tokens:
   access_ttl: 10h
