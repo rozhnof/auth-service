@@ -70,7 +70,6 @@ services:
       interval: 3s
       timeout: 30s
       retries: 5
-    restart: always
 
   jaeger:
     image: jaegertracing/all-in-one:1.35
