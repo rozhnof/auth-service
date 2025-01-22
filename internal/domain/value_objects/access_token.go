@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const Issuer = "stakewolle-auth-service"
+const Issuer = "auth-service"
 
 type AccessTokenPayload struct {
 	UserID uuid.UUID `json:"user_id"`
