@@ -14,10 +14,10 @@ import (
 	pgrepo "github.com/rozhnof/auth-service/internal/infrastructure/repository"
 	"github.com/rozhnof/auth-service/internal/infrastructure/secrets"
 	"github.com/rozhnof/auth-service/internal/pkg/config"
+	"github.com/rozhnof/auth-service/internal/pkg/outbox"
 	"github.com/rozhnof/auth-service/internal/pkg/server"
 	"github.com/rozhnof/auth-service/internal/presentation/clients"
 	"github.com/rozhnof/auth-service/internal/presentation/handlers"
-	"github.com/rozhnof/auth-service/pkg/outbox"
 	trm "github.com/rozhnof/auth-service/pkg/transaction_manager"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.opentelemetry.io/otel/trace"
@@ -46,20 +46,13 @@ var (
 	}
 )
 
-var (
-	topics = []string{
-		loginsTopic,
-		registersTopic,
-	}
-)
-
 type Config struct {
 	Mode     string         `yaml:"mode"    env-required:"true"`
 	Server   config.Server  `yaml:"server"  env-required:"true"`
 	Logger   config.Logger  `yaml:"logging" env-required:"true"`
 	Tokens   config.Tokens  `yaml:"tokens"  env-required:"true"`
 	Tracing  config.Tracing `yaml:"tracing" env-required:"true"`
-	Kafka    config.Kafka   `yaml:"kafka" env-required:"true"`
+	Kafka    config.Kafka   `yaml:"kafka"   env-required:"true"`
 	Postgres config.Postgres
 	Redis    config.Redis
 }
@@ -67,7 +60,6 @@ type Config struct {
 type App struct {
 	logger     *slog.Logger
 	httpServer *server.HTTPServer
-	outbox     *outbox.KafkaOutboxSender
 }
 
 func NewApp(
@@ -85,17 +77,18 @@ func NewApp(
 	)
 
 	var (
-		userRepository = pgrepo.NewUserRepository(txManager, logger, tracer)
+		userRepository   = pgrepo.NewUserRepository(txManager, logger, tracer)
+		outboxRepository = pgrepo.NewOutboxRepository(txManager, logger, tracer)
 	)
 
-	var (
-		kafkaSender  = kafka.NewMessageSender(kafkaProducer)
-		outboxSender = outbox.NewKafkaOutboxSender(txManager, kafkaSender, logger, tracer)
-	)
+	// var (
+	// 	loginsKafkaSender    = kafka.NewMessageSender(kafkaProducer, loginsTopic)
+	// 	registersKafkaSender = kafka.NewMessageSender(kafkaProducer, registersTopic)
+	// )
 
 	var (
-		loginMessageSender    = NewMessageSender[services.LoginMessage](outboxSender, loginsTopic)
-		registerMessageSender = NewMessageSender[services.RegisterMessage](outboxSender, registersTopic)
+		loginsOutboxSender    = outbox.NewMessageSender(outboxRepository, loginsTopic)
+		registersOutboxSender = outbox.NewMessageSender(outboxRepository, registersTopic)
 	)
 
 	var (
@@ -108,8 +101,8 @@ func NewApp(
 			userRepository,
 			txManager,
 			secretManager,
-			loginMessageSender,
-			registerMessageSender,
+			loginsOutboxSender,
+			registersOutboxSender,
 			logger,
 			tracer,
 			authServiceConfig,
@@ -157,16 +150,9 @@ func NewApp(
 	return &App{
 		logger:     logger,
 		httpServer: httpServer,
-		outbox:     outboxSender,
 	}
 }
 
 func (a *App) Run(ctx context.Context) error {
-	go func() {
-		if err := a.outbox.Run(ctx, topics, OutboxBatchSize, OutboxInterval); err != nil {
-			a.logger.Error("kafka reader error", slog.String("error", err.Error()))
-		}
-	}()
-
 	return a.httpServer.Run(ctx)
 }

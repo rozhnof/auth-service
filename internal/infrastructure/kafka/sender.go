@@ -21,7 +21,7 @@ func NewMessageSender(producer Producer, topic string) MessageSender {
 }
 
 func (s MessageSender) SendMessage(ctx context.Context, msg any) error {
-	kafkaMessage, err := s.buildKafkaMessage(msg)
+	kafkaMessage, err := s.buildMessage(msg)
 	if err != nil {
 		return err
 	}
@@ -33,7 +33,7 @@ func (s MessageSender) SendMessage(ctx context.Context, msg any) error {
 	return nil
 }
 
-func (s MessageSender) buildKafkaMessage(value any) (*sarama.ProducerMessage, error) {
+func (s MessageSender) buildMessage(value any) (*sarama.ProducerMessage, error) {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
