@@ -33,16 +33,6 @@ const (
 	registersTopic = "registers"
 )
 
-const (
-	googleCallbackURL = "http://localhost:8080/auth/google/callback"
-)
-
-var (
-	googleOAuthScopes = []string{
-		"https://www.googleapis.com/auth/userinfo.email",
-	}
-)
-
 type Config struct {
 	Mode     string         `yaml:"mode"    env-required:"true"`
 	Server   config.Server  `yaml:"server"  env-required:"true"`
@@ -50,6 +40,7 @@ type Config struct {
 	Tokens   config.Tokens  `yaml:"tokens"  env-required:"true"`
 	Tracing  config.Tracing `yaml:"tracing" env-required:"true"`
 	Kafka    config.Kafka   `yaml:"kafka"   env-required:"true"`
+	OAuth    config.OAuth   `yaml:"oauth"   env-required:"true"`
 	Postgres config.Postgres
 	Redis    config.Redis
 }
@@ -107,10 +98,10 @@ func NewApp(
 	)
 
 	googleAuthHandlerConfig := oauth2.Config{
-		RedirectURL:  googleCallbackURL,
+		RedirectURL:  cfg.OAuth.Google.RedirectURL,
 		ClientID:     string(secretManager.GoogleClientID().Get()),
 		ClientSecret: string(secretManager.GoogleClientSecret().Get()),
-		Scopes:       googleOAuthScopes,
+		Scopes:       cfg.OAuth.Google.Scopes,
 		Endpoint:     google.Endpoint,
 	}
 
