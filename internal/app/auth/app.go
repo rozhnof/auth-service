@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"log/slog"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,9 +25,7 @@ import (
 )
 
 const (
-	ServiceName     = "Auth Service"
-	OutboxBatchSize = 100
-	OutboxInterval  = time.Second * 30
+	ServiceName = "Auth Service"
 )
 
 const (
