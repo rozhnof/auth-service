@@ -23,8 +23,8 @@ type AuthService struct {
 	repository        repo.UserRepository
 	txManager         repo.TransactionManager
 	secretManager     SecretManager
-	loginMsgSender    LoginMessageSender
-	registerMsgSender RegisterMessageSender
+	loginMsgSender    MessageSender
+	registerMsgSender MessageSender
 	log               *slog.Logger
 	tracer            trace.Tracer
 	cfg               AuthServiceConfig
@@ -34,8 +34,8 @@ func NewAuthService(
 	repository repo.UserRepository,
 	txManager repo.TransactionManager,
 	secretManager SecretManager,
-	loginMsgSender LoginMessageSender,
-	registerMsgSender RegisterMessageSender,
+	loginMsgSender MessageSender,
+	registerMsgSender MessageSender,
 	log *slog.Logger,
 	tracer trace.Tracer,
 	cfg AuthServiceConfig,

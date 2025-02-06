@@ -2,22 +2,26 @@ package kafka
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/IBM/sarama"
+	"github.com/google/uuid"
 )
 
 type MessageSender struct {
 	producer Producer
+	topic    string
 }
 
-func NewMessageSender(producer Producer) MessageSender {
+func NewMessageSender(producer Producer, topic string) MessageSender {
 	return MessageSender{
 		producer: producer,
+		topic:    topic,
 	}
 }
 
-func (s MessageSender) SendMessage(ctx context.Context, message Message) error {
-	kafkaMessage, err := s.buildKafkaMessage(message)
+func (s MessageSender) SendMessage(ctx context.Context, msg any) error {
+	kafkaMessage, err := s.buildKafkaMessage(msg)
 	if err != nil {
 		return err
 	}
@@ -29,30 +33,16 @@ func (s MessageSender) SendMessage(ctx context.Context, message Message) error {
 	return nil
 }
 
-func (s MessageSender) SendMessages(ctx context.Context, messages []Message) error {
-	kafkaMessageList := make([]*sarama.ProducerMessage, 0, len(messages))
-
-	for _, message := range messages {
-		kafkaMessage, err := s.buildKafkaMessage(message)
-		if err != nil {
-			return err
-		}
-
-		kafkaMessageList = append(kafkaMessageList, kafkaMessage)
+func (s MessageSender) buildKafkaMessage(value any) (*sarama.ProducerMessage, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
 	}
 
-	if err := s.producer.SendMessages(kafkaMessageList); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s MessageSender) buildKafkaMessage(message Message) (*sarama.ProducerMessage, error) {
 	return &sarama.ProducerMessage{
-		Key:       sarama.StringEncoder(message.Key.String()),
-		Value:     sarama.ByteEncoder(message.Value),
-		Topic:     message.Topic,
+		Key:       sarama.StringEncoder(uuid.NewString()),
+		Value:     sarama.ByteEncoder(data),
+		Topic:     s.topic,
 		Partition: -1,
 	}, nil
 }
